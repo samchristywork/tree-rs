@@ -17,6 +17,10 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
         let entry = entry.unwrap();
         let path = entry.path();
 
+        if path.file_name().unwrap().to_str().unwrap().starts_with(".") {
+            continue;
+        }
+
         if path.is_dir() {
             let child = read_dir_recursive(path);
             root.children.push(child);
