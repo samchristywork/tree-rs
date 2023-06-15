@@ -36,6 +36,36 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
     root
 }
 
+fn print_tree(root: &TreeNode, indent: &Vec<String>) {
+    let mut indent = indent.clone();
+
+    if indent.len() == 0 {
+        println!("{}", root.val);
+    } else {
+        println!("{}── {}", indent.join(""), root.val);
+    }
+
+    if root.children.len() != 0 {
+        if indent.len() > 0 && indent.last().unwrap() == "├" {
+            indent.pop();
+            indent.push("│   ".to_string());
+        }
+        if indent.len() > 0 && indent.last().unwrap() == "└" {
+            indent.pop();
+            indent.push("    ".to_string());
+        }
+        indent.push("├".to_string());
+    }
+
+    for (i, child) in root.children.iter().enumerate() {
+        if i == root.children.len() - 1 {
+            indent.pop();
+            indent.push("└".to_string());
+        }
+        print_tree(child, &indent);
+    }
+}
+
 fn sort_tree(root: &mut TreeNode) {
     root.children.sort_by(|a, b| a.val.cmp(&b.val));
 
@@ -52,4 +82,5 @@ fn main() {
     let dirname = PathBuf::from(dirname);
     let mut root = read_dir_recursive(dirname);
     sort_tree(&mut root);
+    print_tree(&root, &Vec::new());
 }
