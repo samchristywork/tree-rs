@@ -36,6 +36,12 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
     root
 }
 
+fn sort_tree(root: &mut TreeNode) {
+    root.children.sort_by(|a, b| a.val.cmp(&b.val));
+
+    for child in &mut root.children {
+        sort_tree(child);
+    }
 }
 
 fn main() {
@@ -44,5 +50,6 @@ fn main() {
     let dirname = args.iter().nth(1).unwrap();
 
     let dirname = PathBuf::from(dirname);
-    let root = read_dir_recursive(dirname);
+    let mut root = read_dir_recursive(dirname);
+    sort_tree(&mut root);
 }
