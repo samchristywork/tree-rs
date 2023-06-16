@@ -168,6 +168,23 @@ fn sort_tree(root: &mut TreeNode) {
     }
 }
 
+fn filter_tree(root: &TreeNode, filter: &str) -> TreeNode {
+    let mut new_root = TreeNode {
+        color: root.color,
+        val: root.val.clone(),
+        children: Vec::new(),
+    };
+
+    for child in &root.children {
+        let node = filter_tree(child, filter);
+        if node.children.len() != 0 || node.val.contains(filter) {
+            new_root.children.push(node);
+        }
+    }
+
+    new_root
+}
+
 fn usage() {
     println!("Usage: tree <dirname>");
 }
