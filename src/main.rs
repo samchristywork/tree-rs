@@ -1,12 +1,14 @@
 use std::path::PathBuf;
 
 struct TreeNode {
+    color: i32,
     val: String,
     children: Vec<TreeNode>,
 }
 
 fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
     let mut root = TreeNode {
+        color: 33,
         val: dirname.file_name().unwrap().to_str().unwrap().to_string(),
         children: Vec::new(),
     };
@@ -26,6 +28,7 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
             root.children.push(child);
         } else {
             let child = TreeNode {
+                color: 34,
                 val: path.file_name().unwrap().to_str().unwrap().to_string(),
                 children: Vec::new(),
             };
@@ -40,9 +43,14 @@ fn print_tree(root: &TreeNode, indent: &Vec<String>) {
     let mut indent = indent.clone();
 
     if indent.len() == 0 {
+        print!("\x1b[{}m", root.color);
         println!("{}", root.val);
+        print!("\x1b[0m");
     } else {
-        println!("{}── {}", indent.join(""), root.val);
+        print!("{}──", indent.join(""));
+        print!("\x1b[{}m", root.color);
+        println!(" {}", root.val);
+        print!("\x1b[0m");
     }
 
     if root.children.len() != 0 {
