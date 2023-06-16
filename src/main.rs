@@ -82,8 +82,21 @@ fn sort_tree(root: &mut TreeNode) {
     }
 }
 
+fn usage() {
+    println!("Usage: tree <dirname>");
+}
+
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let mut args: Vec<String> = std::env::args().collect();
+
+    if args.len() == 1 {
+        args.push(".".to_string());
+    }
+
+    if args.len() > 2 {
+        usage();
+        return;
+    }
 
     let dirname = args.iter().nth(1).unwrap();
 
