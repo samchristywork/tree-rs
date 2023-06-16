@@ -100,7 +100,15 @@ fn main() {
 
     let dirname = args.iter().nth(1).unwrap();
 
-    let dirname = PathBuf::from(dirname).canonicalize().unwrap();
+    let dirname = match PathBuf::from(dirname).canonicalize() {
+        Ok(path) => path,
+        Err(e) => {
+            println!("Error: {}", e);
+            usage();
+            return;
+        }
+    };
+
     let mut root = read_dir_recursive(dirname);
     sort_tree(&mut root);
     print_tree(&root, &Vec::new());
