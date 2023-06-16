@@ -6,6 +6,25 @@ struct TreeNode {
     children: Vec<TreeNode>,
 }
 
+fn get_filetype(path: &PathBuf) -> i32 {
+    let metadata = match std::fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(_) => {
+            return 0;
+        }
+    };
+
+    if metadata.is_dir() {
+        return 1;
+    }
+
+    if metadata.is_file() {
+        return 2;
+    }
+
+    0
+}
+
 fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
     let mut root = TreeNode {
         color: 33,
