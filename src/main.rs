@@ -13,7 +13,12 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
         children: Vec::new(),
     };
 
-    let entries = std::fs::read_dir(dirname).unwrap();
+    let entries = match std::fs::read_dir(dirname) {
+        Ok(entries) => entries,
+        Err(_) => {
+            return root;
+        }
+    };
 
     for entry in entries {
         let entry = entry.unwrap();
