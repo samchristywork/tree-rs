@@ -54,6 +54,10 @@ fn print_node_name(dirname: &PathBuf) {
 }
 
 fn read_dir_recursive_and_print(dirname: PathBuf, indent: &Vec<String>) {
+    if indent.len() == 0 {
+        print_node_name(&dirname);
+    }
+
     let entries = match std::fs::read_dir(dirname) {
         Ok(entries) => entries,
         Err(_) => {
