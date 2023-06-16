@@ -46,6 +46,47 @@ fn print_node_name(dirname: &PathBuf) {
     }
 }
 
+fn read_dir_recursive_and_print(dirname: PathBuf, indent: &Vec<String>) {
+    let entries = match std::fs::read_dir(dirname) {
+        Ok(entries) => entries,
+        Err(_) => {
+            return;
+        }
+    };
+
+    let mut entries: Vec<_> = entries.collect();
+
+    for (i, entry) in entries.iter().enumerate() {
+        let entry = entry.as_ref().unwrap();
+        let path = entry.path();
+
+        if path.is_dir() {
+            if i == entries.len() - 1 {
+                print!("{}└── ", indent.join(""));
+                print_node_name(&path);
+                let mut indent = indent.clone();
+                indent.push("    ".to_string());
+                read_dir_recursive_and_print(path, &indent);
+            } else {
+                print!("{}├── ", indent.join(""));
+                print_node_name(&path);
+                let mut indent = indent.clone();
+                indent.push("│   ".to_string());
+                read_dir_recursive_and_print(path, &indent);
+            }
+
+        } else {
+            if i == entries.len() - 1 {
+                print!("{}└── ", indent.join(""));
+                print_node_name(&path);
+            } else {
+                print!("{}├── ", indent.join(""));
+                print_node_name(&path);
+            }
+        }
+    }
+}
+
 fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
     let mut root = TreeNode {
         color: 33,
