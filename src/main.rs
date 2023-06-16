@@ -25,6 +25,27 @@ fn get_filetype(path: &PathBuf) -> i32 {
     0
 }
 
+fn print_node_name(dirname: &PathBuf) {
+    match get_filetype(&dirname) {
+        0 => {
+            print!("\x1b[{}m", 31);
+            println!("{}", dirname.file_name().unwrap().to_str().unwrap());
+            print!("\x1b[0m");
+        }
+        1 => {
+            print!("\x1b[{}m", 33);
+            println!("{}", dirname.file_name().unwrap().to_str().unwrap());
+            print!("\x1b[0m");
+        }
+        2 => {
+            print!("\x1b[{}m", 34);
+            println!("{}", dirname.file_name().unwrap().to_str().unwrap());
+            print!("\x1b[0m");
+        }
+        _ => {}
+    }
+}
+
 fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
     let mut root = TreeNode {
         color: 33,
