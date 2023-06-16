@@ -34,7 +34,14 @@ fn print_node_name(dirname: &PathBuf) {
         }
         1 => {
             print!("\x1b[{}m", 33);
-            println!("{}", dirname.file_name().unwrap().to_str().unwrap());
+            println!(
+                "{}",
+                dirname
+                    .file_name()
+                    .unwrap_or(std::ffi::OsStr::new("/"),)
+                    .to_str()
+                    .unwrap()
+            );
             print!("\x1b[0m");
         }
         2 => {
