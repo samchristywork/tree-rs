@@ -139,18 +139,19 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
     root
 }
 
-fn print_tree(root: &TreeNode, indent: &Vec<String>) {
+fn print_tree(root: &TreeNode, indent: &Vec<String>) -> String {
+    let mut return_string = String::new();
     let mut indent = indent.clone();
 
     if indent.len() == 0 {
-        print!("\x1b[{}m", root.color);
-        println!("{}", root.val);
-        print!("\x1b[0m");
+        return_string.push_str(&format!("\x1b[{}m", root.color));
+        return_string.push_str(&format!("{}", root.val));
+        return_string.push_str(&format!("\x1b[0m\n"));
     } else {
-        print!("{}──", indent.join(""));
-        print!("\x1b[{}m", root.color);
-        println!(" {}", root.val);
-        print!("\x1b[0m");
+        return_string.push_str(&format!("{}──", indent.join("")));
+        return_string.push_str(&format!("\x1b[{}m", root.color));
+        return_string.push_str(&format!(" {}", root.val));
+        return_string.push_str(&format!("\x1b[0m\n"));
     }
 
     if root.children.len() != 0 {
@@ -170,8 +171,9 @@ fn print_tree(root: &TreeNode, indent: &Vec<String>) {
             indent.pop();
             indent.push("└".to_string());
         }
-        print_tree(child, &indent);
+        return_string.push_str(&print_tree(child, &indent));
     }
+    return_string
 }
 
 fn sort_tree(root: &mut TreeNode) {
