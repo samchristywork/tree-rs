@@ -66,6 +66,7 @@ fn read_dir_recursive_and_print(dirname: PathBuf, indent: &Vec<String>) {
     };
 
     let mut entries: Vec<_> = entries.collect();
+    entries.sort_by(|a, b| a.as_ref().unwrap().path().cmp(&b.as_ref().unwrap().path()));
 
     for (i, entry) in entries.iter().enumerate() {
         let entry = entry.as_ref().unwrap();
