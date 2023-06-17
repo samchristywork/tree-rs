@@ -68,6 +68,26 @@ fn read_dir_recursive_and_print(dirname: PathBuf, indent: &Vec<String>) {
     let mut entries: Vec<_> = entries.collect();
     entries.sort_by(|a, b| a.as_ref().unwrap().path().cmp(&b.as_ref().unwrap().path()));
 
+    entries.retain(|entry| {
+        let entry = entry.as_ref().unwrap();
+        let path = entry.path();
+
+        if path.file_name().unwrap().to_str().unwrap().starts_with(".") {
+            return false;
+        }
+        if path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("target")
+        {
+            return false;
+        }
+
+        true
+    });
+
     for (i, entry) in entries.iter().enumerate() {
         let entry = entry.as_ref().unwrap();
         let path = entry.path();
@@ -120,6 +140,16 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
         let path = entry.path();
 
         if path.file_name().unwrap().to_str().unwrap().starts_with(".") {
+            continue;
+        }
+
+        if path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("target")
+        {
             continue;
         }
 
