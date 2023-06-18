@@ -1,4 +1,15 @@
-use std::path::PathBuf;
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use std::{io, path::PathBuf};
+use tui::{
+    backend::{Backend, CrosstermBackend},
+    text::{Span, Spans},
+    widgets::{Block, Borders, Paragraph},
+    Frame, Terminal,
+};
 
 struct TreeNode {
     color: i32,
@@ -255,6 +266,26 @@ fn filter_tree(root: &TreeNode, filter: &str) -> TreeNode {
 
 fn usage() {
     println!("Usage: tree <dirname>");
+}
+
+fn ui(f: &mut Frame<impl Backend>, content: Option<String>) {
+    let size = f.size();
+    let block = Block::default().title("Main").borders(Borders::ALL);
+    let mut text = Vec::new();
+
+    match content {
+        Some(c) => {
+            c.split("\n").for_each(|line| {
+                text.push(Spans::from(vec![Span::raw(format!("{}", line))]));
+            });
+        }
+        None => {}
+    }
+
+    let paragraph = Paragraph::new(text)
+        .block(block)
+        .wrap(tui::widgets::Wrap { trim: true });
+    f.render_widget(paragraph, size);
 }
 
 fn main() {
