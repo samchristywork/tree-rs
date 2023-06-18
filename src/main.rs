@@ -288,6 +288,27 @@ fn ui(f: &mut Frame<impl Backend>, content: Option<String>) {
     f.render_widget(paragraph, size);
 }
 
+fn render(root: &TreeNode) {
+    enable_raw_mode().unwrap();
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal.clear().unwrap();
+    let content = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
+    terminal.draw(|f| ui(f, Some(content))).unwrap();
+
+    disable_raw_mode().unwrap();
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )
+    .unwrap();
+    terminal.show_cursor().unwrap();
+}
+
 fn main() {
     let mut args: Vec<String> = std::env::args().collect();
 
