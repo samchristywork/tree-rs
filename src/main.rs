@@ -6,6 +6,7 @@ use crossterm::{
 use std::{io, path::PathBuf};
 use tui::{
     backend::{Backend, CrosstermBackend},
+    layout::Rect,
     text::{Span, Spans},
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
@@ -268,9 +269,19 @@ fn usage() {
     println!("Usage: tree <dirname>");
 }
 
-fn ui(f: &mut Frame<impl Backend>, content: Option<String>) {
-    let size = f.size();
-    let block = Block::default().title("Main").borders(Borders::ALL);
+fn ui(f: &mut Frame<impl Backend>, search_term: Option<String>, content: Option<String>) {
+    let mut main_window_size = f.size();
+    main_window_size.height -= 3;
+
+    let search_window_size = Rect::new(
+        main_window_size.x,
+        main_window_size.y + main_window_size.height,
+        main_window_size.width,
+        3,
+    );
+
+    let tree_window = Block::default().title("Tree").borders(Borders::ALL);
+    let search_window = Block::default().title("Search").borders(Borders::ALL);
     let mut text = Vec::new();
 
     match content {
@@ -282,10 +293,16 @@ fn ui(f: &mut Frame<impl Backend>, content: Option<String>) {
         None => {}
     }
 
-    let paragraph = Paragraph::new(text)
-        .block(block)
-        .wrap(tui::widgets::Wrap { trim: true });
-    f.render_widget(paragraph, size);
+    let tree_widget = Paragraph::new(text)
+        .block(tree_window)
+        .wrap(tui::widgets::Wrap { trim: false });
+
+    let search_widget = Paragraph::new(search_term.unwrap_or("".to_string()))
+        .block(search_window)
+        .wrap(tui::widgets::Wrap { trim: false });
+
+    f.render_widget(tree_widget, main_window_size);
+    f.render_widget(search_widget, search_window_size);
 }
 
 fn render(root: &TreeNode) {
@@ -297,7 +314,7 @@ fn render(root: &TreeNode) {
 
     terminal.clear().unwrap();
     let content = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
-    terminal.draw(|f| ui(f, Some(content))).unwrap();
+    terminal.draw(|f| ui(f, None, Some(content))).unwrap();
 
     let mut search_term = String::new();
     loop {
@@ -307,13 +324,14 @@ fn render(root: &TreeNode) {
                     search_term.push(c);
                     let tree = filter_tree(&root, &search_term);
                     let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
-                    terminal.draw(|f| ui(f, Some(content.clone()))).unwrap();
+                    terminal
+                        .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))
+                        .unwrap();
                 }
                 KeyCode::Esc => {
                     break;
                 }
                 e => {
-                    // println!("{:?}", e);
                 }
             }
         }
