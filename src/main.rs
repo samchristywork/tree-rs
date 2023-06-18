@@ -169,19 +169,41 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
     root
 }
 
-fn print_tree(root: &TreeNode, indent: &Vec<String>) -> String {
+enum ColorOptions {
+    Default,
+    NoColor,
+}
+
+fn print_tree(root: &TreeNode, indent: &Vec<String>, color_options: &ColorOptions) -> String {
     let mut return_string = String::new();
     let mut indent = indent.clone();
 
     if indent.len() == 0 {
-        return_string.push_str(&format!("\x1b[{}m", root.color));
-        return_string.push_str(&format!("{}", root.val));
-        return_string.push_str(&format!("\x1b[0m\n"));
+        match color_options {
+            ColorOptions::Default => {
+                return_string.push_str(&format!("\x1b[{}m", root.color));
+                return_string.push_str(&format!("{}", root.val));
+                return_string.push_str(&format!("\x1b[0m\n"));
+            }
+            ColorOptions::NoColor => {
+                return_string.push_str(&format!("{}", root.val));
+                return_string.push_str(&format!("\n"));
+            }
+        }
     } else {
-        return_string.push_str(&format!("{}──", indent.join("")));
-        return_string.push_str(&format!("\x1b[{}m", root.color));
-        return_string.push_str(&format!(" {}", root.val));
-        return_string.push_str(&format!("\x1b[0m\n"));
+        match color_options {
+            ColorOptions::Default => {
+                return_string.push_str(&format!("{}──", indent.join("")));
+                return_string.push_str(&format!("\x1b[{}m", root.color));
+                return_string.push_str(&format!(" {}", root.val));
+                return_string.push_str(&format!("\x1b[0m\n"));
+            }
+            ColorOptions::NoColor => {
+                return_string.push_str(&format!("{}──", indent.join("")));
+                return_string.push_str(&format!(" {}", root.val));
+                return_string.push_str(&format!("\n"));
+            }
+        }
     }
 
     if root.children.len() != 0 {
@@ -201,7 +223,7 @@ fn print_tree(root: &TreeNode, indent: &Vec<String>) -> String {
             indent.pop();
             indent.push("└".to_string());
         }
-        return_string.push_str(&print_tree(child, &indent));
+        return_string.push_str(&print_tree(child, &indent, color_options));
     }
     return_string
 }
