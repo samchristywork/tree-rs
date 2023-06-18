@@ -299,6 +299,26 @@ fn render(root: &TreeNode) {
     let content = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
     terminal.draw(|f| ui(f, Some(content))).unwrap();
 
+    let mut search_term = String::new();
+    loop {
+        if let Event::Key(key) = event::read().unwrap() {
+            match key.code {
+                KeyCode::Char(c) => {
+                    search_term.push(c);
+                    let tree = filter_tree(&root, &search_term);
+                    let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
+                    terminal.draw(|f| ui(f, Some(content.clone()))).unwrap();
+                }
+                KeyCode::Esc => {
+                    break;
+                }
+                e => {
+                    // println!("{:?}", e);
+                }
+            }
+        }
+    }
+
     disable_raw_mode().unwrap();
     execute!(
         terminal.backend_mut(),
