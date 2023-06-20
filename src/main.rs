@@ -15,6 +15,9 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
+use std::time::Instant;
+use tokio::runtime::Runtime;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum NodeType {
@@ -606,7 +609,7 @@ async fn render(root: &mut TreeNode, dirname: PathBuf) {
         }
     });
 
-    let mut interval = tokio::time::interval(Duration::from_millis(100));
+    let mut interval = tokio::time::interval(Duration::from_millis(10));
     task::spawn(async move {
         loop {
             tokio::select! {
@@ -672,6 +675,28 @@ async fn render(root: &mut TreeNode, dirname: PathBuf) {
     }
 
     term_teardown(&mut terminal);
+}
+
+fn render2(root: &mut TreeNode, dirname: PathBuf) {
+    let mut search_term = String::new();
+
+    let mut ret = None;
+    let mut running = true;
+    loop {
+        if running{
+            let mut counter = 0;
+            ret = read_dir_incremental(root, dirname.clone(), ret, &mut counter, 400, &mut 0, &mut 0);
+
+            if ret.is_none() {
+                let out = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
+                println!("{}", out);
+
+                running = false;
+                break;
+            }
+        }
+    }
+
 }
 
 #[tokio::main]
