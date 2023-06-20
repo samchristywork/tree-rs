@@ -259,6 +259,8 @@ fn read_dir_incremental(
     begin_from: Option<PathBuf>,
     counter: &mut i32,
     increment: i32,
+    directories: &mut i32,
+    files: &mut i32,
 ) -> Option<PathBuf> {
     root.color = 33;
     root.val = dirname.file_name().unwrap().to_str().unwrap().to_string();
@@ -314,11 +316,14 @@ fn read_dir_incremental(
                             begin_from.clone(),
                             counter,
                             increment,
+                            directories,
+                            files,
                         );
                         if let Some(left_off_from) = left_off_from {
                             return Some(left_off_from);
                         }
                     } else {
+                        *directories += 1;
                         let mut child = TreeNode {
                             color: 33,
                             val,
@@ -331,6 +336,8 @@ fn read_dir_incremental(
                             begin_from.clone(),
                             counter,
                             increment,
+                            directories,
+                            files,
                         );
                         root.children.push(child);
                         if let Some(left_off_from) = left_off_from {
@@ -340,6 +347,7 @@ fn read_dir_incremental(
                 }
                 None => {
                     *counter += 1;
+                    *directories += 1;
                     let mut child = TreeNode {
                         color: 33,
                         val,
@@ -352,6 +360,8 @@ fn read_dir_incremental(
                         begin_from.clone(),
                         counter,
                         increment,
+                        directories,
+                        files,
                     );
                     root.children.push(child);
                     if let Some(left_off_from) = left_off_from {
@@ -361,6 +371,7 @@ fn read_dir_incremental(
             }
         } else {
             *counter += 1;
+            *files += 1;
             let child = TreeNode {
                 color: 34,
                 val: path.file_name().unwrap().to_str().unwrap().to_string(),
@@ -645,6 +656,7 @@ async fn main() {
         color: 33,
         val: dirname.to_str().unwrap().to_string(),
         children: Vec::new(),
+        node_type: NodeType::Dir,
     };
 
     render(&mut root, dirname).await;
