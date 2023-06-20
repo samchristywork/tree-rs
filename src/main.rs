@@ -385,6 +385,41 @@ fn read_dir_incremental(
     None
 }
 
+fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf) {
+    root.color = 33;
+    root.val = dirname.file_name().unwrap().to_str().unwrap().to_string();
+
+    if dirname.is_file() {
+        root.node_type = NodeType::File;
+        return;
+    }
+
+    root.node_type = NodeType::Dir;
+    let entries = match std::fs::read_dir(&dirname) {
+        Ok(entries) => entries,
+        Err(_) => {
+            return;
+        }
+    };
+
+    let mut entries: Vec<_> = entries.collect();
+    entries.sort_by(|a, b| a.as_ref().unwrap().path().cmp(&b.as_ref().unwrap().path()));
+
+    for entry in entries {
+        let path = entry.unwrap().path();
+
+        let val = path.file_name().unwrap().to_str().unwrap().to_string();
+        root.children.push(TreeNode {
+            color: 33,
+            val,
+            children: Vec::new(),
+            node_type: NodeType::Dir,
+        });
+
+        read_dir_incremental_2(root.children.last_mut().unwrap(), path);
+    }
+}
+
 fn print_tree(root: &TreeNode, indent: &Vec<String>, color_options: &ColorOptions) -> String {
     let mut return_string = String::new();
     let mut indent = indent.clone();
