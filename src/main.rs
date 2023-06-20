@@ -1,3 +1,4 @@
+use clap::{arg, command, ArgGroup, ArgMatches, Command};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -265,8 +266,18 @@ fn filter_tree(root: &TreeNode, filter: &str) -> TreeNode {
     new_root
 }
 
-fn usage() {
-    println!("Usage: tree <dirname>");
+fn cli() -> Command {
+    command!()
+        .group(ArgGroup::new("foo").multiple(true))
+        .next_help_heading("FOO")
+        .args([arg!(-d --depth <LEVEL> "Descend only level directories deep").group("foo")])
+        .group(ArgGroup::new("bar").multiple(true))
+        .next_help_heading("BAR")
+        .args([
+            arg!(-o - -or "expr2 is not evaluate if exp1 is true").group("bar"),
+            arg!(-a - -and "Same as `expr1 expr1`").group("bar"),
+        ])
+        .arg(arg!(<dirname> "Directory name").required(false))
 }
 
 fn ui(f: &mut Frame<impl Backend>, search_term: Option<String>, content: Option<String>) {
