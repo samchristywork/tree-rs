@@ -342,6 +342,14 @@ fn render(root: &TreeNode) {
                 KeyCode::Esc => {
                     break;
                 }
+                KeyCode::Backspace => {
+                    search_term.pop();
+                    let tree = filter_tree(&root, &search_term);
+                    let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
+                    terminal
+                        .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))
+                        .unwrap();
+                }
                 e => {
                 }
             }
