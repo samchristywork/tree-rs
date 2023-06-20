@@ -182,6 +182,58 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
     root
 }
 
+fn read_dir_recursive_in_place(root: &mut TreeNode, dirname: PathBuf) {
+    root.color = 33;
+    root.val = dirname.file_name().unwrap().to_str().unwrap().to_string();
+    root.children = Vec::new();
+
+    let entries = match std::fs::read_dir(dirname) {
+        Ok(entries) => entries,
+        Err(_) => {
+            return;
+        }
+    };
+
+    let mut entries: Vec<_> = entries.collect();
+    entries.sort_by(|a, b| a.as_ref().unwrap().path().cmp(&b.as_ref().unwrap().path()));
+
+    for entry in entries {
+        let entry = entry.unwrap();
+        let path = entry.path();
+
+        if path.file_name().unwrap().to_str().unwrap().starts_with(".") {
+            continue;
+        }
+
+        if path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("target")
+        {
+            continue;
+        }
+
+        if path.is_dir() {
+            let mut child = TreeNode {
+                color: 33,
+                val: path.file_name().unwrap().to_str().unwrap().to_string(),
+                children: Vec::new(),
+            };
+            read_dir_recursive_in_place(&mut child, path);
+            root.children.push(child);
+        } else {
+            let child = TreeNode {
+                color: 34,
+                val: path.file_name().unwrap().to_str().unwrap().to_string(),
+                children: Vec::new(),
+            };
+            root.children.push(child);
+        }
+    }
+}
+
 enum ColorOptions {
     Default,
     NoColor,
