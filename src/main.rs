@@ -16,10 +16,17 @@ use tui::{
     Frame, Terminal,
 };
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum NodeType {
+    File,
+    Dir,
+}
+
 struct TreeNode {
     color: i32,
     val: String,
     children: Vec<TreeNode>,
+    node_type: NodeType,
 }
 
 enum ColorOptions {
@@ -144,6 +151,7 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
         color: 33,
         val: dirname.file_name().unwrap().to_str().unwrap().to_string(),
         children: Vec::new(),
+        node_type: NodeType::Dir,
     };
 
     let entries = match std::fs::read_dir(dirname) {
@@ -182,6 +190,7 @@ fn read_dir_recursive(dirname: PathBuf) -> TreeNode {
                 color: 34,
                 val: path.file_name().unwrap().to_str().unwrap().to_string(),
                 children: Vec::new(),
+                node_type: NodeType::File,
             };
             root.children.push(child);
         }
@@ -228,6 +237,7 @@ fn read_dir_recursive_in_place(root: &mut TreeNode, dirname: PathBuf) {
                 color: 33,
                 val: path.file_name().unwrap().to_str().unwrap().to_string(),
                 children: Vec::new(),
+                node_type: NodeType::Dir,
             };
             read_dir_recursive_in_place(&mut child, path);
             root.children.push(child);
@@ -236,6 +246,7 @@ fn read_dir_recursive_in_place(root: &mut TreeNode, dirname: PathBuf) {
                 color: 34,
                 val: path.file_name().unwrap().to_str().unwrap().to_string(),
                 children: Vec::new(),
+                node_type: NodeType::File,
             };
             root.children.push(child);
         }
@@ -312,6 +323,7 @@ fn read_dir_incremental(
                             color: 33,
                             val,
                             children: Vec::new(),
+                            node_type: NodeType::Dir,
                         };
                         let left_off_from = read_dir_incremental(
                             &mut child,
@@ -332,6 +344,7 @@ fn read_dir_incremental(
                         color: 33,
                         val,
                         children: Vec::new(),
+                        node_type: NodeType::Dir,
                     };
                     let left_off_from = read_dir_incremental(
                         &mut child,
@@ -352,6 +365,7 @@ fn read_dir_incremental(
                 color: 34,
                 val: path.file_name().unwrap().to_str().unwrap().to_string(),
                 children: Vec::new(),
+                node_type: NodeType::File,
             };
             root.children.push(child);
         }
@@ -428,6 +442,7 @@ fn filter_tree(root: &TreeNode, filter: &str) -> TreeNode {
         color: root.color,
         val: root.val.clone(),
         children: Vec::new(),
+        node_type: root.node_type,
     };
 
     for child in &root.children {
