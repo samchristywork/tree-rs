@@ -1,10 +1,13 @@
-use clap::{arg, command, ArgGroup, ArgMatches, Command};
+use clap::{arg, command, ArgGroup, Command};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use std::time::Duration;
 use std::{io, path::PathBuf};
+use tokio::sync::mpsc;
+use tokio::task;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::Rect,
@@ -285,7 +288,6 @@ fn read_dir_incremental(
         }
 
         if *counter > increment {
-            println!("counter: {}", *counter);
             return Some(path);
         }
 
@@ -488,7 +490,7 @@ fn ui(f: &mut Frame<impl Backend>, search_term: Option<String>, content: Option<
     f.render_widget(search_widget, search_window_size);
 }
 
-fn render(root: &TreeNode) {
+fn term_setup() -> Terminal<CrosstermBackend<std::io::Stdout>> {
     enable_raw_mode().unwrap();
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();
@@ -496,38 +498,11 @@ fn render(root: &TreeNode) {
     let mut terminal = Terminal::new(backend).unwrap();
 
     terminal.clear().unwrap();
-    let content = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
-    terminal.draw(|f| ui(f, None, Some(content))).unwrap();
 
-    let mut search_term = String::new();
-    loop {
-        if let Event::Key(key) = event::read().unwrap() {
-            match key.code {
-                KeyCode::Char(c) => {
-                    search_term.push(c);
-                    let tree = filter_tree(&root, &search_term);
-                    let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
-                    terminal
-                        .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))
-                        .unwrap();
-                }
-                KeyCode::Esc => {
-                    break;
-                }
-                KeyCode::Backspace => {
-                    search_term.pop();
-                    let tree = filter_tree(&root, &search_term);
-                    let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
-                    terminal
-                        .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))
-                        .unwrap();
-                }
-                _ => {
-                }
-            }
-        }
-    }
+    terminal
+}
 
+fn term_teardown(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) {
     disable_raw_mode().unwrap();
     execute!(
         terminal.backend_mut(),
@@ -538,30 +513,124 @@ fn render(root: &TreeNode) {
     terminal.show_cursor().unwrap();
 }
 
-fn main() {
-    let mut args: Vec<String> = std::env::args().collect();
+fn refresh(
+    root: &TreeNode,
+    search_term: String,
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+) {
+    let tree = filter_tree(&root, &search_term);
+    let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
+    terminal
+        .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))
+        .unwrap();
+}
 
-    if args.len() == 1 {
-        args.push(".".to_string());
+async fn render(root: &mut TreeNode, dirname: PathBuf) {
+    let mut terminal = term_setup();
+
+    let content = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
+    terminal.draw(|f| ui(f, None, Some(content))).unwrap();
+
+    let mut search_term = String::new();
+
+    let (tick_tx, tick_rx) = mpsc::channel(1);
+    let (tx, mut rx) = mpsc::channel(100);
+    task::spawn(async move {
+        loop {
+            if let Ok(event) = event::read() {
+                if tx.send(event).await.is_err() {
+                    break;
+                }
+            }
+        }
+    });
+
+    let mut interval = tokio::time::interval(Duration::from_millis(100));
+    task::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    if tick_tx.send(()).await.is_err() {
+                        break;
+                    }
+                }
+                else => break,
+            }
+        }
+    });
+
+    let mut tick_rx = Some(tick_rx);
+
+    let mut ret = None;
+    let mut running = true;
+    loop {
+        tokio::select! {
+            _ = tick_rx.as_mut().unwrap().recv() => {
+                if running{
+                let mut counter = 0;
+                ret = read_dir_incremental(root, dirname.clone(), ret, &mut counter, 4);
+
+                let tree = filter_tree(&root, &search_term);
+                let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
+                terminal
+                    .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))
+                    .unwrap();
+
+                if ret.is_none() {
+                    running = false;
+                }
+                }
+            }
+            Some(event) = rx.recv() => {
+                if let Event::Key(key) = event {
+                    match key.code {
+                        KeyCode::Char(c) => {
+                            search_term.push(c);
+                            refresh(&root, search_term.clone(), &mut terminal);
+                            }
+                        KeyCode::Esc => {
+                            break;
+                        }
+                        KeyCode::Backspace => {
+                            search_term.pop();
+                            refresh(&root, search_term.clone(), &mut terminal);
+                            }
+                        _ => {
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    if args.len() > 2 {
-        usage();
-        return;
-    }
+    term_teardown(&mut terminal);
+}
 
-    let dirname = args.iter().nth(1).unwrap();
+#[tokio::main]
+async fn main() {
+    let args = cli().get_matches();
+
+    let depth: Option<&String> = args.get_one("depth");
+    let dirname: Option<&String> = args.get_one("dirname");
+
+    let dirname = match dirname {
+        Some(d) => d,
+        None => ".",
+    };
 
     let dirname = match PathBuf::from(dirname).canonicalize() {
         Ok(path) => path,
         Err(e) => {
             println!("Error: {}", e);
-            usage();
             return;
         }
     };
 
-    let mut root = read_dir_recursive(dirname);
-    sort_tree(&mut root);
-    print_tree(&root, &Vec::new());
+    let mut root = TreeNode {
+        color: 33,
+        val: dirname.to_str().unwrap().to_string(),
+        children: Vec::new(),
+    };
+
+    render(&mut root, dirname).await;
 }
