@@ -627,19 +627,26 @@ async fn render(root: &mut TreeNode, dirname: PathBuf) {
     loop {
         tokio::select! {
             _ = tick_rx.as_mut().unwrap().recv() => {
-                if running{
-                let mut counter = 0;
-                ret = read_dir_incremental(root, dirname.clone(), ret, &mut counter, 4);
+                let start = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+                loop {
+                    if running{
+                    let mut counter = 0;
+                    ret = read_dir_incremental(root, dirname.clone(), ret, &mut counter, 4, &mut 0, &mut 0);
 
-                let tree = filter_tree(&root, &search_term);
-                let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
-                terminal
-                    .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))
-                    .unwrap();
+                    let tree = filter_tree(&root, &search_term);
+                    let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
+                    terminal
+                        .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))
+                        .unwrap();
 
-                if ret.is_none() {
-                    running = false;
-                }
+                    if ret.is_none() {
+                        running = false;
+                    }
+                    }
+                    let end = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+                    if end - start > 100 {
+                        break;
+                    }
                 }
             }
             Some(event) = rx.recv() => {
