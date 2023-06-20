@@ -234,6 +234,130 @@ fn read_dir_recursive_in_place(root: &mut TreeNode, dirname: PathBuf) {
     }
 }
 
+fn read_dir_incremental(
+    root: &mut TreeNode,
+    dirname: PathBuf,
+    begin_from: Option<PathBuf>,
+    counter: &mut i32,
+    increment: i32,
+) -> Option<PathBuf> {
+    root.color = 33;
+    root.val = dirname.file_name().unwrap().to_str().unwrap().to_string();
+
+    let entries = match std::fs::read_dir(&dirname) {
+        Ok(entries) => entries,
+        Err(_) => {
+            return None;
+        }
+    };
+
+    let mut entries: Vec<_> = entries.collect();
+    entries.sort_by(|a, b| a.as_ref().unwrap().path().cmp(&b.as_ref().unwrap().path()));
+
+    for entry in entries {
+        let entry = entry.unwrap();
+        let path = entry.path();
+
+        if path.file_name().unwrap().to_str().unwrap().starts_with(".") {
+            continue;
+        }
+
+        if path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("target")
+        {
+            continue;
+        }
+
+        let mut equal = false;
+        if let Some(bf) = &begin_from {
+            let bf = bf.iter().zip(path.iter()).collect::<Vec<_>>();
+            if bf.last().unwrap().0 > bf.last().unwrap().1 {
+                continue;
+            }
+            if bf.last().unwrap().0 == bf.last().unwrap().1 {
+                println!("path: {:?}", path);
+                equal = true;
+            }
+        }
+
+        if *counter > increment {
+            println!("counter: {}", *counter);
+            return Some(path);
+        }
+
+        if path.is_dir() {
+            let val = path.file_name().unwrap().to_str().unwrap().to_string();
+            let mut last = root.children.last_mut();
+            match last {
+                Some(last) => {
+                    if last.val == val {
+                        let left_off_from = read_dir_incremental(
+                            last,
+                            path,
+                            begin_from.clone(),
+                            counter,
+                            increment,
+                        );
+                        if let Some(left_off_from) = left_off_from {
+                            return Some(left_off_from);
+                        }
+                    } else {
+                        let mut child = TreeNode {
+                            color: 33,
+                            val,
+                            children: Vec::new(),
+                        };
+                        let left_off_from = read_dir_incremental(
+                            &mut child,
+                            path,
+                            begin_from.clone(),
+                            counter,
+                            increment,
+                        );
+                        root.children.push(child);
+                        if let Some(left_off_from) = left_off_from {
+                            return Some(left_off_from);
+                        }
+                    }
+                }
+                None => {
+                    *counter += 1;
+                    let mut child = TreeNode {
+                        color: 33,
+                        val,
+                        children: Vec::new(),
+                    };
+                    let left_off_from = read_dir_incremental(
+                        &mut child,
+                        path,
+                        begin_from.clone(),
+                        counter,
+                        increment,
+                    );
+                    root.children.push(child);
+                    if let Some(left_off_from) = left_off_from {
+                        return Some(left_off_from);
+                    }
+                }
+            }
+        } else {
+            *counter += 1;
+            let child = TreeNode {
+                color: 34,
+                val: path.file_name().unwrap().to_str().unwrap().to_string(),
+                children: Vec::new(),
+            };
+            root.children.push(child);
+        }
+    }
+
+    None
+}
+
 enum ColorOptions {
     Default,
     NoColor,
