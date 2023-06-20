@@ -19,6 +19,11 @@ struct TreeNode {
     children: Vec<TreeNode>,
 }
 
+enum ColorOptions {
+    Default,
+    NoColor,
+}
+
 fn get_filetype(path: &PathBuf) -> i32 {
     let metadata = match std::fs::metadata(path) {
         Ok(metadata) => metadata,
@@ -272,15 +277,10 @@ fn read_dir_incremental(
             continue;
         }
 
-        let mut equal = false;
         if let Some(bf) = &begin_from {
             let bf = bf.iter().zip(path.iter()).collect::<Vec<_>>();
             if bf.last().unwrap().0 > bf.last().unwrap().1 {
                 continue;
-            }
-            if bf.last().unwrap().0 == bf.last().unwrap().1 {
-                println!("path: {:?}", path);
-                equal = true;
             }
         }
 
@@ -291,7 +291,7 @@ fn read_dir_incremental(
 
         if path.is_dir() {
             let val = path.file_name().unwrap().to_str().unwrap().to_string();
-            let mut last = root.children.last_mut();
+            let last = root.children.last_mut();
             match last {
                 Some(last) => {
                     if last.val == val {
@@ -358,11 +358,6 @@ fn read_dir_incremental(
     None
 }
 
-enum ColorOptions {
-    Default,
-    NoColor,
-}
-
 fn print_tree(root: &TreeNode, indent: &Vec<String>, color_options: &ColorOptions) -> String {
     let mut return_string = String::new();
     let mut indent = indent.clone();
@@ -414,6 +409,7 @@ fn print_tree(root: &TreeNode, indent: &Vec<String>, color_options: &ColorOption
         }
         return_string.push_str(&print_tree(child, &indent, color_options));
     }
+
     return_string
 }
 
@@ -526,7 +522,7 @@ fn render(root: &TreeNode) {
                         .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))
                         .unwrap();
                 }
-                e => {
+                _ => {
                 }
             }
         }
