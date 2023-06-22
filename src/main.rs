@@ -408,18 +408,38 @@ fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf) {
     let mut entries: Vec<_> = entries.collect();
     entries.sort_by(|a, b| a.as_ref().unwrap().path().cmp(&b.as_ref().unwrap().path()));
 
-    for entry in entries {
-        let path = entry.unwrap().path();
+    if root.children.len() == 0 {
 
-        let val = path.file_name().unwrap().to_str().unwrap().to_string();
-        root.children.push(TreeNode {
-            color: 33,
-            val,
-            children: Vec::new(),
-            node_type: NodeType::Dir,
-        });
+        for entry in entries {
+            let path = entry.unwrap().path();
 
-        read_dir_incremental_2(root.children.last_mut().unwrap(), path);
+
+            let val = path.file_name().unwrap().to_str().unwrap().to_string();
+            root.children.push(TreeNode {
+                color: 33,
+                val,
+                children: Vec::new(),
+                node_type: NodeType::Dir,
+            });
+
+            read_dir_incremental_2(root.children.last_mut().unwrap(), path);
+        }
+    } else {
+        let last_val = root.children.last().unwrap().val.clone();
+        for entry in entries {
+            let path = entry.unwrap().path();
+
+            let val = path.file_name().unwrap().to_str().unwrap().to_string();
+
+            root.children.push(TreeNode {
+                color: 33,
+                val,
+                children: Vec::new(),
+                node_type: NodeType::Dir,
+            });
+
+            read_dir_incremental_2(root.children.last_mut().unwrap(), path);
+        }
     }
 }
 
