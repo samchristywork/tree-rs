@@ -717,6 +717,11 @@ async fn render(root: &mut TreeNode, dirname: PathBuf) {
 }
 
 fn render2(root: &mut TreeNode, dirname: PathBuf) {
+    let mut terminal = term_setup();
+
+    let content = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
+    terminal.draw(|f| ui(f, None, Some(content))).unwrap();
+
     let mut search_term = String::new();
 
     let mut ret = None;
@@ -727,15 +732,22 @@ fn render2(root: &mut TreeNode, dirname: PathBuf) {
             ret = read_dir_incremental(root, dirname.clone(), ret, &mut counter, 400, &mut 0, &mut 0);
 
             if ret.is_none() {
-                let out = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
-                println!("{}", out);
-
                 running = false;
-                break;
+            }
+        }
+
+        if let Ok(event) = event::poll(Duration::from_millis(duration)) {
+            if event {
+                if let Ok(event) = event::read() {
+                    if let Event::Key(key) = event {
+                        println!("{:?}", key);
+                    }
+                }
             }
         }
     }
 
+    term_teardown(&mut terminal);
 }
 
 fn get_tree_count(root: &TreeNode, node_type: NodeType) -> usize {
