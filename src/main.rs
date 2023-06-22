@@ -726,6 +726,7 @@ fn render2(root: &mut TreeNode, dirname: PathBuf) {
 
     let mut ret = None;
     let mut running = true;
+    let mut duration = 0;
     loop {
         if running{
             let mut counter = 0;
@@ -733,6 +734,7 @@ fn render2(root: &mut TreeNode, dirname: PathBuf) {
 
             if ret.is_none() {
                 running = false;
+                duration = 10;
             }
         }
 
