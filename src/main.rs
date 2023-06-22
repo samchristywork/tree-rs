@@ -738,6 +738,17 @@ fn render2(root: &mut TreeNode, dirname: PathBuf) {
 
 }
 
+fn get_tree_count(root: &TreeNode, node_type: NodeType) -> usize {
+    let mut count = 0;
+    for child in &root.children {
+        if child.node_type == node_type {
+            count += 1;
+        }
+        count += get_tree_count(child, node_type);
+    }
+    count
+}
+
 #[tokio::main]
 async fn main() {
     let args = cli().get_matches();
