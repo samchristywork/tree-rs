@@ -736,6 +736,7 @@ fn render2(root: &mut TreeNode, dirname: PathBuf) {
                 running = false;
                 duration = 10;
             }
+            refresh(&root, search_term.clone(), &mut terminal);
         }
 
         if let Ok(event) = event::poll(Duration::from_millis(duration)) {
