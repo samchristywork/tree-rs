@@ -430,20 +430,34 @@ fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32
             read_dir_incremental_2(root.children.last_mut().unwrap(), path, limit);
         }
     } else {
+        let mut start=false;
         let last_val = root.children.last().unwrap().val.clone();
         for entry in entries {
             let path = entry.unwrap().path();
 
             let val = path.file_name().unwrap().to_str().unwrap().to_string();
 
-            root.children.push(TreeNode {
-                color: 33,
-                val,
-                children: Vec::new(),
-                node_type: NodeType::Dir,
-            });
+            if val == last_val {
+                start = true;
+                *limit += 1;
+                read_dir_incremental_2(root.children.last_mut().unwrap(), path, limit);
+                continue;
+            }
 
-            read_dir_incremental_2(root.children.last_mut().unwrap(), path, limit);
+            if start {
+                if limit == &0 {
+                    return;
+                }
+
+                root.children.push(TreeNode {
+                    color: 33,
+                    val,
+                    children: Vec::new(),
+                    node_type: NodeType::Dir,
+                });
+
+                read_dir_incremental_2(root.children.last_mut().unwrap(), path, limit);
+            }
         }
     }
 }
