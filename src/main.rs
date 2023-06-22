@@ -1,11 +1,10 @@
+pub mod util;
+
+use crate::util::{filter_tree, print_node_name, term_setup, term_teardown};
 use clap::{arg, command, ArgGroup, Command};
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use std::time::Duration;
-use std::{io, path::PathBuf};
+use crossterm::event::{self, Event, KeyCode};
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::{path::PathBuf, time::Duration};
 use tokio::sync::mpsc;
 use tokio::task;
 use tui::{
@@ -15,17 +14,14 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
-use std::time::Instant;
-use tokio::runtime::Runtime;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-enum NodeType {
+pub enum NodeType {
     File,
     Dir,
 }
 
-struct TreeNode {
+pub struct TreeNode {
     color: i32,
     val: String,
     children: Vec<TreeNode>,
@@ -35,53 +31,6 @@ struct TreeNode {
 enum ColorOptions {
     Default,
     NoColor,
-}
-
-fn get_filetype(path: &PathBuf) -> i32 {
-    let metadata = match std::fs::metadata(path) {
-        Ok(metadata) => metadata,
-        Err(_) => {
-            return 0;
-        }
-    };
-
-    if metadata.is_dir() {
-        return 1;
-    }
-
-    if metadata.is_file() {
-        return 2;
-    }
-
-    0
-}
-
-fn print_node_name(dirname: &PathBuf) {
-    match get_filetype(&dirname) {
-        0 => {
-            print!("\x1b[{}m", 31);
-            println!("{}", dirname.file_name().unwrap().to_str().unwrap());
-            print!("\x1b[0m");
-        }
-        1 => {
-            print!("\x1b[{}m", 33);
-            println!(
-                "{}",
-                dirname
-                    .file_name()
-                    .unwrap_or(std::ffi::OsStr::new("/"),)
-                    .to_str()
-                    .unwrap()
-            );
-            print!("\x1b[0m");
-        }
-        2 => {
-            print!("\x1b[{}m", 34);
-            println!("{}", dirname.file_name().unwrap().to_str().unwrap());
-            print!("\x1b[0m");
-        }
-        _ => {}
-    }
 }
 
 fn read_dir_recursive_and_print(dirname: PathBuf, indent: &Vec<String>) {
@@ -411,7 +360,6 @@ fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32
     entries.sort_by(|a, b| a.as_ref().unwrap().path().cmp(&b.as_ref().unwrap().path()));
 
     if root.children.len() == 0 {
-
         for entry in entries {
             let path = entry.unwrap().path();
 
@@ -430,7 +378,7 @@ fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32
             read_dir_incremental_2(root.children.last_mut().unwrap(), path, limit);
         }
     } else {
-        let mut start=false;
+        let mut start = false;
         let last_val = root.children.last().unwrap().val.clone();
         for entry in entries {
             let path = entry.unwrap().path();
@@ -517,32 +465,6 @@ fn print_tree(root: &TreeNode, indent: &Vec<String>, color_options: &ColorOption
     return_string
 }
 
-fn sort_tree(root: &mut TreeNode) {
-    root.children.sort_by(|a, b| a.val.cmp(&b.val));
-
-    for child in &mut root.children {
-        sort_tree(child);
-    }
-}
-
-fn filter_tree(root: &TreeNode, filter: &str) -> TreeNode {
-    let mut new_root = TreeNode {
-        color: root.color,
-        val: root.val.clone(),
-        children: Vec::new(),
-        node_type: root.node_type,
-    };
-
-    for child in &root.children {
-        let node = filter_tree(child, filter);
-        if node.children.len() != 0 || node.val.contains(filter) {
-            new_root.children.push(node);
-        }
-    }
-
-    new_root
-}
-
 fn cli() -> Command {
     command!()
         .group(ArgGroup::new("foo").multiple(true))
@@ -591,29 +513,6 @@ fn ui(f: &mut Frame<impl Backend>, search_term: Option<String>, content: Option<
 
     f.render_widget(tree_widget, main_window_size);
     f.render_widget(search_widget, search_window_size);
-}
-
-fn term_setup() -> Terminal<CrosstermBackend<std::io::Stdout>> {
-    enable_raw_mode().unwrap();
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend).unwrap();
-
-    terminal.clear().unwrap();
-
-    terminal
-}
-
-fn term_teardown(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) {
-    disable_raw_mode().unwrap();
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )
-    .unwrap();
-    terminal.show_cursor().unwrap();
 }
 
 fn refresh(
@@ -728,9 +627,17 @@ fn render2(root: &mut TreeNode, dirname: PathBuf) {
     let mut running = true;
     let mut duration = 0;
     loop {
-        if running{
+        if running {
             let mut counter = 0;
-            ret = read_dir_incremental(root, dirname.clone(), ret, &mut counter, 400, &mut 0, &mut 0);
+            ret = read_dir_incremental(
+                root,
+                dirname.clone(),
+                ret,
+                &mut counter,
+                400,
+                &mut 0,
+                &mut 0,
+            );
 
             if ret.is_none() {
                 running = false;
@@ -751,17 +658,6 @@ fn render2(root: &mut TreeNode, dirname: PathBuf) {
     }
 
     term_teardown(&mut terminal);
-}
-
-fn get_tree_count(root: &TreeNode, node_type: NodeType) -> usize {
-    let mut count = 0;
-    for child in &root.children {
-        if child.node_type == node_type {
-            count += 1;
-        }
-        count += get_tree_count(child, node_type);
-    }
-    count
 }
 
 #[tokio::main]
@@ -791,5 +687,5 @@ async fn main() {
         node_type: NodeType::Dir,
     };
 
-    render(&mut root, dirname).await;
+    render2(&mut root, dirname.clone());
 }
