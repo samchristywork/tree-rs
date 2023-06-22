@@ -388,9 +388,11 @@ fn read_dir_incremental(
     None
 }
 
-fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf) {
+fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32) {
     root.color = 33;
     root.val = dirname.file_name().unwrap().to_str().unwrap().to_string();
+
+    *limit -= 1;
 
     if dirname.is_file() {
         root.node_type = NodeType::File;
@@ -413,6 +415,9 @@ fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf) {
         for entry in entries {
             let path = entry.unwrap().path();
 
+            if limit == &0 {
+                return;
+            }
 
             let val = path.file_name().unwrap().to_str().unwrap().to_string();
             root.children.push(TreeNode {
@@ -422,7 +427,7 @@ fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf) {
                 node_type: NodeType::Dir,
             });
 
-            read_dir_incremental_2(root.children.last_mut().unwrap(), path);
+            read_dir_incremental_2(root.children.last_mut().unwrap(), path, limit);
         }
     } else {
         let last_val = root.children.last().unwrap().val.clone();
@@ -438,7 +443,7 @@ fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf) {
                 node_type: NodeType::Dir,
             });
 
-            read_dir_incremental_2(root.children.last_mut().unwrap(), path);
+            read_dir_incremental_2(root.children.last_mut().unwrap(), path, limit);
         }
     }
 }
