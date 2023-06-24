@@ -7,7 +7,7 @@ use crossterm::{
 use std::{io, path::PathBuf};
 use tui::{backend::CrosstermBackend, Terminal};
 
-fn print_node_name(dirname: &PathBuf) {
+pub fn print_node_name(dirname: &PathBuf) {
     match get_filetype(&dirname) {
         0 => {
             print!("\x1b[{}m", 31);
@@ -35,7 +35,7 @@ fn print_node_name(dirname: &PathBuf) {
     }
 }
 
-fn get_filetype(path: &PathBuf) -> i32 {
+pub fn get_filetype(path: &PathBuf) -> i32 {
     let metadata = match std::fs::metadata(path) {
         Ok(metadata) => metadata,
         Err(_) => {
@@ -54,7 +54,7 @@ fn get_filetype(path: &PathBuf) -> i32 {
     0
 }
 
-fn sort_tree(root: &mut TreeNode) {
+pub fn sort_tree(root: &mut TreeNode) {
     root.children.sort_by(|a, b| a.val.cmp(&b.val));
 
     for child in &mut root.children {
@@ -62,7 +62,7 @@ fn sort_tree(root: &mut TreeNode) {
     }
 }
 
-fn filter_tree(root: &TreeNode, filter: &str) -> TreeNode {
+pub fn filter_tree(root: &TreeNode, filter: &str) -> TreeNode {
     let mut new_root = TreeNode {
         color: root.color,
         val: root.val.clone(),
@@ -80,7 +80,7 @@ fn filter_tree(root: &TreeNode, filter: &str) -> TreeNode {
     new_root
 }
 
-fn term_setup() -> Terminal<CrosstermBackend<std::io::Stdout>> {
+pub fn term_setup() -> Terminal<CrosstermBackend<std::io::Stdout>> {
     enable_raw_mode().unwrap();
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();
@@ -92,7 +92,7 @@ fn term_setup() -> Terminal<CrosstermBackend<std::io::Stdout>> {
     terminal
 }
 
-fn term_teardown(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) {
+pub fn term_teardown(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) {
     disable_raw_mode().unwrap();
     execute!(
         terminal.backend_mut(),
@@ -103,7 +103,7 @@ fn term_teardown(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) {
     terminal.show_cursor().unwrap();
 }
 
-fn get_tree_count(root: &TreeNode, node_type: NodeType) -> usize {
+pub fn get_tree_count(root: &TreeNode, node_type: NodeType) -> usize {
     let mut count = 0;
     for child in &root.children {
         if child.node_type == node_type {
