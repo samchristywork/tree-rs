@@ -467,15 +467,10 @@ fn print_tree(root: &TreeNode, indent: &Vec<String>, color_options: &ColorOption
 
 fn cli() -> Command {
     command!()
-        .group(ArgGroup::new("foo").multiple(true))
-        .next_help_heading("FOO")
-        .args([arg!(-d --depth <LEVEL> "Descend only level directories deep").group("foo")])
-        .group(ArgGroup::new("bar").multiple(true))
-        .next_help_heading("BAR")
-        .args([
-            arg!(-o - -or "expr2 is not evaluate if exp1 is true").group("bar"),
-            arg!(-a - -and "Same as `expr1 expr1`").group("bar"),
-        ])
+        .group(ArgGroup::new("LISTING OPTIONS").multiple(true))
+        .next_help_heading("LISTING OPTIONS")
+        .args([arg!(-d --depth <level> "Descend only level directories deep").group("LISTING OPTIONS")])
+        .args([arg!(-n --number <number> "Specify the number of items to return").group("LISTING OPTIONS")])
         .arg(arg!(<dirname> "Directory name").required(false))
 }
 
