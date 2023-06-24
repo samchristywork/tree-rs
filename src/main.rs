@@ -205,7 +205,7 @@ fn read_dir_recursive_in_place(root: &mut TreeNode, dirname: PathBuf) {
     }
 }
 
-fn read_dir_incremental(
+fn legacy_read_dir_incremental(
     root: &mut TreeNode,
     dirname: PathBuf,
     begin_from: Option<PathBuf>,
@@ -262,7 +262,7 @@ fn read_dir_incremental(
             match last {
                 Some(last) => {
                     if last.val == val {
-                        let left_off_from = read_dir_incremental(
+                        let left_off_from = legacy_read_dir_incremental(
                             last,
                             path,
                             begin_from.clone(),
@@ -282,7 +282,7 @@ fn read_dir_incremental(
                             children: Vec::new(),
                             node_type: NodeType::Dir,
                         };
-                        let left_off_from = read_dir_incremental(
+                        let left_off_from = legacy_read_dir_incremental(
                             &mut child,
                             path,
                             begin_from.clone(),
@@ -306,7 +306,7 @@ fn read_dir_incremental(
                         children: Vec::new(),
                         node_type: NodeType::Dir,
                     };
-                    let left_off_from = read_dir_incremental(
+                    let left_off_from = legacy_read_dir_incremental(
                         &mut child,
                         path,
                         begin_from.clone(),
@@ -337,7 +337,7 @@ fn read_dir_incremental(
     None
 }
 
-fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32) {
+fn read_dir_incremental(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32) {
     root.color = 33;
     root.val = dirname.file_name().unwrap().to_str().unwrap().to_string();
 
@@ -375,7 +375,7 @@ fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32
                 node_type: NodeType::Dir,
             });
 
-            read_dir_incremental_2(root.children.last_mut().unwrap(), path, limit);
+            read_dir_incremental(root.children.last_mut().unwrap(), path, limit);
         }
     } else {
         let mut start = false;
@@ -388,7 +388,7 @@ fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32
             if val == last_val {
                 start = true;
                 *limit += 1;
-                read_dir_incremental_2(root.children.last_mut().unwrap(), path, limit);
+                read_dir_incremental(root.children.last_mut().unwrap(), path, limit);
                 continue;
             }
 
@@ -404,7 +404,7 @@ fn read_dir_incremental_2(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32
                     node_type: NodeType::Dir,
                 });
 
-                read_dir_incremental_2(root.children.last_mut().unwrap(), path, limit);
+                read_dir_incremental(root.children.last_mut().unwrap(), path, limit);
             }
         }
     }
@@ -527,7 +527,7 @@ fn refresh(
         .unwrap();
 }
 
-async fn render(root: &mut TreeNode, dirname: PathBuf) {
+async fn legacy_render(root: &mut TreeNode, dirname: PathBuf) {
     let mut terminal = term_setup();
 
     let content = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
@@ -572,7 +572,7 @@ async fn render(root: &mut TreeNode, dirname: PathBuf) {
                 loop {
                     if running{
                     let mut counter = 0;
-                    ret = read_dir_incremental(root, dirname.clone(), ret, &mut counter, 4, &mut 0, &mut 0);
+                    ret = legacy_read_dir_incremental(root, dirname.clone(), ret, &mut counter, 4, &mut 0, &mut 0);
 
                     let tree = filter_tree(&root, &search_term);
                     let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
@@ -615,7 +615,7 @@ async fn render(root: &mut TreeNode, dirname: PathBuf) {
     term_teardown(&mut terminal);
 }
 
-fn render2(root: &mut TreeNode, dirname: PathBuf) {
+fn render(root: &mut TreeNode, dirname: PathBuf) {
     let mut terminal = term_setup();
 
     let content = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
@@ -629,7 +629,7 @@ fn render2(root: &mut TreeNode, dirname: PathBuf) {
     loop {
         if running {
             let mut counter = 0;
-            ret = read_dir_incremental(
+            ret = legacy_read_dir_incremental(
                 root,
                 dirname.clone(),
                 ret,
@@ -700,5 +700,5 @@ async fn main() {
         node_type: NodeType::Dir,
     };
 
-    render2(&mut root, dirname.clone());
+    render(&mut root, dirname.clone());
 }
