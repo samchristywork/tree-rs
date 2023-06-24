@@ -1,6 +1,8 @@
-use crate::util::{term_setup, term_teardown};
-use crate::{legacy_read_dir_incremental, refresh, ui};
-use crate::{ColorOptions, TreeNode};
+use crate::{
+    read_dir_incremental, refresh, ui,
+    util::{term_setup, term_teardown},
+    ColorOptions, TreeNode,
+};
 use crossterm::event::{self, Event, KeyCode};
 use std::{path::PathBuf, time::Duration};
 
@@ -67,7 +69,6 @@ pub fn render(root: &mut TreeNode, dirname: PathBuf) {
 
     let mut search_term = String::new();
 
-    let mut ret = None;
     let mut running = true;
     let mut duration = 0;
     loop {
