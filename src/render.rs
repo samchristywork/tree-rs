@@ -73,18 +73,10 @@ pub fn render(root: &mut TreeNode, dirname: PathBuf) {
     let mut duration = 0;
     loop {
         if running {
-            let mut counter = 0;
-            ret = legacy_read_dir_incremental(
-                root,
-                dirname.clone(),
-                ret,
-                &mut counter,
-                400,
-                &mut 0,
-                &mut 0,
-            );
+            let mut allocated = 100;
+            read_dir_incremental(root, dirname.clone(), &mut allocated);
 
-            if ret.is_none() {
+            if allocated > 0 {
                 running = false;
                 duration = 10;
             }
