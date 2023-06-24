@@ -30,7 +30,7 @@ pub struct TreeNode {
     node_type: NodeType,
 }
 
-enum ColorOptions {
+pub enum ColorOptions {
     Default,
     NoColor,
 }
