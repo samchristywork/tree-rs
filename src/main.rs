@@ -650,7 +650,20 @@ fn render2(root: &mut TreeNode, dirname: PathBuf) {
             if event {
                 if let Ok(event) = event::read() {
                     if let Event::Key(key) = event {
-                        println!("{:?}", key);
+                        match key.code {
+                            KeyCode::Char(c) => {
+                                search_term.push(c);
+                                refresh(&root, search_term.clone(), &mut terminal);
+                            }
+                            KeyCode::Esc => {
+                                break;
+                            }
+                            KeyCode::Backspace => {
+                                search_term.pop();
+                                refresh(&root, search_term.clone(), &mut terminal);
+                            }
+                            _ => {}
+                        }
                     }
                 }
             }
