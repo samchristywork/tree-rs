@@ -1,41 +1,22 @@
 use crate::{
     read_dir_incremental, refresh, ui,
     util::{term_setup, term_teardown},
-    ColorOptions, TreeNode,
+    TreeNode,
 };
 use crossterm::event::{self, Event, KeyCode};
 use std::{path::PathBuf, time::Duration};
 
-pub fn print_tree(root: &TreeNode, indent: &Vec<String>, color_options: &ColorOptions) -> String {
+pub fn print_tree(root: &TreeNode, indent: &Vec<String>) -> String {
     let mut return_string = String::new();
     let mut indent = indent.clone();
 
     if indent.len() == 0 {
-        match color_options {
-            ColorOptions::Default => {
-                return_string.push_str(&format!("\x1b[{}m", root.color));
-                return_string.push_str(&format!("{}", root.val));
-                return_string.push_str(&format!("\x1b[0m\n"));
-            }
-            ColorOptions::NoColor => {
-                return_string.push_str(&format!("{}", root.val));
-                return_string.push_str(&format!("\n"));
-            }
-        }
+        return_string.push_str(&format!("{}", root.val));
+        return_string.push_str(&format!("\n"));
     } else {
-        match color_options {
-            ColorOptions::Default => {
-                return_string.push_str(&format!("{}──", indent.join("")));
-                return_string.push_str(&format!("\x1b[{}m", root.color));
-                return_string.push_str(&format!(" {}", root.val));
-                return_string.push_str(&format!("\x1b[0m\n"));
-            }
-            ColorOptions::NoColor => {
-                return_string.push_str(&format!("{}──", indent.join("")));
-                return_string.push_str(&format!(" {}", root.val));
-                return_string.push_str(&format!("\n"));
-            }
-        }
+        return_string.push_str(&format!("{}──", indent.join("")));
+        return_string.push_str(&format!(" {}", root.val));
+        return_string.push_str(&format!("\n"));
     }
 
     if root.children.len() != 0 {
@@ -55,7 +36,7 @@ pub fn print_tree(root: &TreeNode, indent: &Vec<String>, color_options: &ColorOp
             indent.pop();
             indent.push("└".to_string());
         }
-        return_string.push_str(&print_tree(child, &indent, color_options));
+        return_string.push_str(&print_tree(child, &indent));
     }
 
     return_string
@@ -64,7 +45,7 @@ pub fn print_tree(root: &TreeNode, indent: &Vec<String>, color_options: &ColorOp
 pub fn render(root: &mut TreeNode, dirname: PathBuf) {
     let mut terminal = term_setup();
 
-    let content = print_tree(&root, &Vec::new(), &ColorOptions::NoColor);
+    let content = print_tree(&root, &Vec::new());
     terminal.draw(|f| ui(f, None, Some(content))).unwrap();
 
     let mut search_term = String::new();

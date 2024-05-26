@@ -24,19 +24,12 @@ pub enum NodeType {
 }
 
 pub struct TreeNode {
-    color: i32,
     val: String,
     children: Vec<TreeNode>,
     node_type: NodeType,
 }
 
-pub enum ColorOptions {
-    Default,
-    NoColor,
-}
-
 fn read_dir_incremental(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32) {
-    root.color = 33;
     root.val = dirname.file_name().unwrap().to_str().unwrap().to_string();
 
     *limit -= 1;
@@ -67,7 +60,6 @@ fn read_dir_incremental(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32) 
 
             let val = path.file_name().unwrap().to_str().unwrap().to_string();
             root.children.push(TreeNode {
-                color: 33,
                 val,
                 children: Vec::new(),
                 node_type: NodeType::Dir,
@@ -96,7 +88,6 @@ fn read_dir_incremental(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32) 
                 }
 
                 root.children.push(TreeNode {
-                    color: 33,
                     val,
                     children: Vec::new(),
                     node_type: NodeType::Dir,
@@ -159,7 +150,7 @@ fn refresh(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) {
     let tree = filter_tree(&root, &search_term);
-    let content = print_tree(&tree, &Vec::new(), &ColorOptions::NoColor);
+    let content = print_tree(&tree, &Vec::new());
     terminal
         .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))
         .unwrap();
@@ -186,7 +177,6 @@ async fn main() {
     };
 
     let mut root = TreeNode {
-        color: 33,
         val: dirname.to_str().unwrap().to_string(),
         children: Vec::new(),
         node_type: NodeType::Dir,

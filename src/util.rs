@@ -64,7 +64,6 @@ pub fn sort_tree(root: &mut TreeNode) {
 
 pub fn filter_tree(root: &TreeNode, filter: &str) -> TreeNode {
     let mut new_root = TreeNode {
-        color: root.color,
         val: root.val.clone(),
         children: Vec::new(),
         node_type: root.node_type,
