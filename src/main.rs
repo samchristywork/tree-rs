@@ -2,13 +2,9 @@ pub mod render;
 pub mod util;
 
 use crate::render::{print_tree, render};
-use crate::util::{filter_tree, print_node_name, term_setup, term_teardown};
+use crate::util::filter_tree;
 use clap::{arg, command, ArgGroup, Command};
-use crossterm::event::{self, Event, KeyCode};
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{path::PathBuf, time::Duration};
-use tokio::sync::mpsc;
-use tokio::task;
+use std::path::PathBuf;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::Rect,
