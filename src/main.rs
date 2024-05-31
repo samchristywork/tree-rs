@@ -44,9 +44,9 @@ fn read_dir_incremental(root: &mut TreeNode, dirname: PathBuf, limit: &mut i32) 
     };
 
     let mut entries: Vec<_> = entries.collect();
-    entries.sort_by(|a, b| a.as_ref().unwrap().path().cmp(&b.as_ref().unwrap().path()));
+    entries.sort_by_key(|entry| entry.as_ref().unwrap().path());
 
-    if root.children.len() == 0 {
+    if root.children.is_empty() {
         for entry in entries {
             let path = entry.unwrap().path();
 
@@ -119,13 +119,10 @@ fn ui(f: &mut Frame<impl Backend>, search_term: Option<String>, content: Option<
     let search_window = Block::default().title("Search").borders(Borders::ALL);
     let mut text = Vec::new();
 
-    match content {
-        Some(c) => {
-            c.split("\n").for_each(|line| {
-                text.push(Spans::from(vec![Span::raw(format!("{}", line))]));
-            });
-        }
-        None => {}
+    if let Some(c) = content {
+        c.split("\n").for_each(|line| {
+            text.push(Spans::from(vec![Span::raw(line.to_string())]));
+        });
     }
 
     let tree_widget = Paragraph::new(text)
@@ -145,7 +142,7 @@ fn refresh(
     search_term: String,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) {
-    let tree = filter_tree(&root, &search_term);
+    let tree = filter_tree(root, &search_term);
     let content = print_tree(&tree, &Vec::new());
     terminal
         .draw(|f| ui(f, Some(search_term.clone()), Some(content.clone())))

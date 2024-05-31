@@ -8,7 +8,7 @@ use std::{io, path::PathBuf};
 use tui::{backend::CrosstermBackend, Terminal};
 
 pub fn print_node_name(dirname: &PathBuf) {
-    match get_filetype(&dirname) {
+    match get_filetype(dirname) {
         0 => {
             print!("\x1b[{}m", 31);
             println!("{}", dirname.file_name().unwrap().to_str().unwrap());
@@ -71,7 +71,7 @@ pub fn filter_tree(root: &TreeNode, filter: &str) -> TreeNode {
 
     for child in &root.children {
         let node = filter_tree(child, filter);
-        if node.children.len() != 0 || node.val.contains(filter) {
+        if !node.children.is_empty() || node.val.contains(filter) {
             new_root.children.push(node);
         }
     }

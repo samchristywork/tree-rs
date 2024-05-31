@@ -8,23 +8,23 @@ use std::{path::PathBuf, time::Duration};
 
 pub fn print_tree(root: &TreeNode, indent: &Vec<String>) -> String {
     let mut return_string = String::new();
-    let mut indent = indent.clone();
+    let mut indent = indent.to_owned();
 
-    if indent.len() == 0 {
-        return_string.push_str(&format!("{}", root.val));
-        return_string.push_str(&format!("\n"));
+    if indent.is_empty() {
+        return_string.push_str(&root.val);
+        return_string.push('\n');
     } else {
         return_string.push_str(&format!("{}──", indent.join("")));
         return_string.push_str(&format!(" {}", root.val));
-        return_string.push_str(&format!("\n"));
+        return_string.push('\n');
     }
 
-    if root.children.len() != 0 {
-        if indent.len() > 0 && indent.last().unwrap() == "├" {
+    if root.children.is_empty() {
+        if !indent.is_empty() && indent.last().unwrap() == "├" {
             indent.pop();
             indent.push("│   ".to_string());
         }
-        if indent.len() > 0 && indent.last().unwrap() == "└" {
+        if !indent.is_empty() && indent.last().unwrap() == "└" {
             indent.pop();
             indent.push("    ".to_string());
         }
@@ -45,7 +45,7 @@ pub fn print_tree(root: &TreeNode, indent: &Vec<String>) -> String {
 pub fn render(root: &mut TreeNode, dirname: PathBuf) {
     let mut terminal = term_setup();
 
-    let content = print_tree(&root, &Vec::new());
+    let content = print_tree(root, &Vec::new());
     terminal.draw(|f| ui(f, None, Some(content))).unwrap();
 
     let mut search_term = String::new();
@@ -61,27 +61,25 @@ pub fn render(root: &mut TreeNode, dirname: PathBuf) {
                 running = false;
                 duration = 10;
             }
-            refresh(&root, search_term.clone(), &mut terminal);
+            refresh(root, search_term.clone(), &mut terminal);
         }
 
         if let Ok(event) = event::poll(Duration::from_millis(duration)) {
             if event {
-                if let Ok(event) = event::read() {
-                    if let Event::Key(key) = event {
-                        match key.code {
-                            KeyCode::Char(c) => {
-                                search_term.push(c);
-                                refresh(&root, search_term.clone(), &mut terminal);
-                            }
-                            KeyCode::Esc => {
-                                break;
-                            }
-                            KeyCode::Backspace => {
-                                search_term.pop();
-                                refresh(&root, search_term.clone(), &mut terminal);
-                            }
-                            _ => {}
+                if let Ok(Event::Key(key)) = event::read() {
+                    match key.code {
+                        KeyCode::Char(c) => {
+                            search_term.push(c);
+                            refresh(root, search_term.clone(), &mut terminal);
                         }
+                        KeyCode::Esc => {
+                            break;
+                        }
+                        KeyCode::Backspace => {
+                            search_term.pop();
+                            refresh(root, search_term.clone(), &mut terminal);
+                        }
+                        _ => {}
                     }
                 }
             }
