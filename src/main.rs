@@ -1,11 +1,12 @@
 use std::path::Path;
 
-fn print_directory_tree(dir: &str, prefix: &str) -> std::io::Result<()> {
+fn render_directory_tree(dir: &str, prefix: &str) -> Result<String, std::io::Error> {
     let path = Path::new(dir);
+    let mut output = String::new();
 
     if !path.is_dir() {
-        println!("Error: {} is not a directory.", dir);
-        return Ok(());
+        output.push_str(&format!("Error: {} is not a directory.\n", dir));
+        return Ok(output);
     }
 
     let entries = std::fs::read_dir(path)?;
@@ -21,7 +22,7 @@ fn print_directory_tree(dir: &str, prefix: &str) -> std::io::Result<()> {
         let is_last = i == num_entries - 1;
 
         let connector = if is_last { "└─" } else { "├─" };
-        println!("{}{}{}", prefix, connector, file_name_str);
+        output.push_str(&format!("{}{}{}\n", prefix, connector, file_name_str));
 
         let entry_path = entry.path();
         if entry_path.is_dir() {
@@ -30,13 +31,16 @@ fn print_directory_tree(dir: &str, prefix: &str) -> std::io::Result<()> {
             } else {
                 format!("{}│ ", prefix)
             };
-            print_directory_tree(entry_path.to_str().unwrap(), &new_prefix)?;
+            output.push_str(&render_directory_tree(entry_path.to_str().unwrap(), &new_prefix)?);
         }
     }
 
-    Ok(())
+    Ok(output)
 }
 
 fn main() {
-    print_directory_tree(".", "").expect("Failed to print directory tree");
+    match render_directory_tree("my_dir", "") {
+        Ok(tree) => print!("{}", tree),
+        Err(e) => eprintln!("Failed to render directory tree: {}", e),
+    }
 }
