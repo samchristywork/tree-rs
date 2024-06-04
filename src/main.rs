@@ -1,12 +1,14 @@
 use std::path::Path;
+use regex::Regex;
 
-fn render_directory_tree(dir: &str, prefix: &str) -> Result<String, std::io::Error> {
+fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>) -> Result<(String, bool), std::io::Error> {
     let path = Path::new(dir);
     let mut output = String::new();
+    let mut matched = false;
 
     if !path.is_dir() {
         output.push_str(&format!("Error: {} is not a directory.\n", dir));
-        return Ok(output);
+        return Ok((output, false));
     }
 
     let entries = std::fs::read_dir(path)?;
@@ -22,7 +24,15 @@ fn render_directory_tree(dir: &str, prefix: &str) -> Result<String, std::io::Err
         let is_last = i == num_entries - 1;
 
         let connector = if is_last { "└─" } else { "├─" };
-        output.push_str(&format!("{}{}{}\n", prefix, connector, file_name_str));
+        let line = format!("{}{}{}\n", prefix, connector, file_name_str);
+        output.push_str(&line);
+
+        if let Some(p) = pattern {
+            let re = Regex::new(p).unwrap();
+            if re.is_match(&file_name_str) {
+                matched = true;
+            }
+        }
 
         let entry_path = entry.path();
         if entry_path.is_dir() {
@@ -31,16 +41,21 @@ fn render_directory_tree(dir: &str, prefix: &str) -> Result<String, std::io::Err
             } else {
                 format!("{}│ ", prefix)
             };
-            output.push_str(&render_directory_tree(entry_path.to_str().unwrap(), &new_prefix)?);
+            let (subtree, sub_matched) = render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern)?;
+            output.push_str(&subtree);
+            matched = matched || sub_matched;
         }
     }
 
-    Ok(output)
+    Ok((output, matched))
 }
 
 fn main() {
-    match render_directory_tree("my_dir", "") {
-        Ok(tree) => print!("{}", tree),
+    match render_directory_tree("my_dir", "", Some("c1")) {
+        Ok((tree, matched)) => {
+            print!("{}", tree);
+            println!("Matched pattern: {}", matched);
+        }
         Err(e) => eprintln!("Failed to render directory tree: {}", e),
     }
 }
