@@ -1,7 +1,7 @@
 use std::path::Path;
 use regex::Regex;
 
-fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>) -> Result<(String, bool), std::io::Error> {
+fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>, compact: bool) -> Result<(String, bool), std::io::Error> {
     let path = Path::new(dir);
     let mut output = String::new();
     let mut matched = false;
@@ -23,27 +23,49 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>) -> Resu
         let file_name_str = file_name.to_string_lossy();
         let is_last = i == num_entries - 1;
 
-        let connector = if is_last { "└─" } else { "├─" };
-        let line = format!("{}{}{}\n", prefix, connector, file_name_str);
-        output.push_str(&line);
-
+        let mut current_matched = false;
         if let Some(p) = pattern {
             let re = Regex::new(p).unwrap();
             if re.is_match(&file_name_str) {
+                current_matched = true;
                 matched = true;
             }
         }
 
         let entry_path = entry.path();
+        let mut subtree = String::new();
+
         if entry_path.is_dir() {
             let new_prefix = if is_last {
-                format!("{}  ", prefix)
+                if compact {
+                    format!("{} ", prefix)
+                } else {
+                    format!("{}  ", prefix)
+                }
             } else {
-                format!("{}│ ", prefix)
+                if compact {
+                    format!("{}│", prefix)
+                } else {
+                    format!("{}│ ", prefix)
+                }
             };
-            let (subtree, sub_matched) = render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern)?;
-            output.push_str(&subtree);
+            let (subtree_result, sub_matched_result) = render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern, compact)?;
+            subtree = subtree_result;
+            let sub_matched = sub_matched_result;
             matched = matched || sub_matched;
+            current_matched = current_matched || sub_matched;
+        }
+
+        if current_matched || matched {
+            let connector = match (compact, is_last) {
+                (true, true) => "└",
+                (true, false) => "├",
+                (false, true) => "└─",
+                (false, false) => "├─",
+            };
+            let line = format!("{}{}{}\n", prefix, connector, file_name_str);
+            output.push_str(&line);
+            output.push_str(&subtree);
         }
     }
 
@@ -51,8 +73,11 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>) -> Resu
 }
 
 fn main() {
-    match render_directory_tree("my_dir", "", Some("c1")) {
+    let dir=".";
+    let pattern="query-cache.bin";
+    match render_directory_tree(dir, "", Some(pattern), false) {
         Ok((tree, matched)) => {
+            println!("{dir}");
             print!("{}", tree);
             println!("Matched pattern: {}", matched);
         }
