@@ -1,7 +1,12 @@
 use std::path::Path;
 use regex::Regex;
 
-fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>, compact: bool) -> Result<(String, bool), std::io::Error> {
+enum Style {
+    Compact,
+    Full,
+}
+
+fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>, style: &Style) -> Result<(String, bool), std::io::Error> {
     let path = Path::new(dir);
     let mut output = String::new();
     let mut matched = false;
@@ -37,19 +42,17 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>, compact
 
         if entry_path.is_dir() {
             let new_prefix = if is_last {
-                if compact {
-                    format!("{} ", prefix)
-                } else {
-                    format!("{}  ", prefix)
+                match &style {
+                    Style::Compact => format!("{} ", prefix),
+                    Style::Full => format!("{}  ", prefix),
                 }
             } else {
-                if compact {
-                    format!("{}│", prefix)
-                } else {
-                    format!("{}│ ", prefix)
+                match &style {
+                    Style::Compact => format!("{}│", prefix),
+                    Style::Full => format!("{}│ ", prefix),
                 }
             };
-            let (subtree_result, sub_matched_result) = render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern, compact)?;
+            let (subtree_result, sub_matched_result) = render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern, &style)?;
             subtree = subtree_result;
             let sub_matched = sub_matched_result;
             matched = matched || sub_matched;
@@ -57,11 +60,11 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>, compact
         }
 
         if current_matched || matched {
-            let connector = match (compact, is_last) {
-                (true, true) => "└",
-                (true, false) => "├",
-                (false, true) => "└─",
-                (false, false) => "├─",
+            let connector = match (&style, is_last) {
+                (Style::Compact, true) => "└",
+                (Style::Compact, false) => "├",
+                (Style::Full, true) => "└─",
+                (Style::Full, false) => "├─",
             };
             let line = format!("{}{}{}\n", prefix, connector, file_name_str);
             output.push_str(&line);
@@ -75,7 +78,7 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>, compact
 fn main() {
     let dir=".";
     let pattern="query-cache.bin";
-    match render_directory_tree(dir, "", Some(pattern), false) {
+    match render_directory_tree(dir, "", Some(pattern), &Style::Compact) {
         Ok((tree, matched)) => {
             println!("{dir}");
             print!("{}", tree);
