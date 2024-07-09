@@ -1,5 +1,6 @@
 use std::path::Path;
 use regex::Regex;
+use std::io::Write;
 
 enum Style {
     Compact,
@@ -75,15 +76,51 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>, style: 
     Ok((output, matched))
 }
 
+fn flush() {
+    std::io::stdout().flush().unwrap();
+}
+
+fn alternate_screen() {
+    println!("\x1B[?1049h");
+    flush();
+}
+
+fn normal_screen() {
+    println!("\x1B[?1049l");
+    flush();
+}
+
+fn get_user_input() -> String {
+    let mut input = String::new();
+    print!("Enter pattern to match (or leave empty to show all): ");
+    flush();
+    std::io::stdin().read_line(&mut input).unwrap();
+    input.trim().to_string()
+}
+
 fn main() {
-    let dir=".";
-    let pattern="query-cache.bin";
-    match render_directory_tree(dir, "", Some(pattern), &Style::Compact) {
-        Ok((tree, matched)) => {
-            println!("{dir}");
-            print!("{}", tree);
-            println!("Matched pattern: {}", matched);
+    let dir="my_dir";
+    let mut pattern=String::new();
+
+    alternate_screen();
+
+    loop {
+        match render_directory_tree(dir, "", Some(&pattern), &Style::Compact) {
+            Ok((tree, matched)) => {
+                println!("{dir}");
+                print!("{}", tree);
+                flush();
+                println!("Matched pattern: {}", matched);
+            }
+            Err(e) => eprintln!("Failed to render directory tree: {}", e),
         }
-        Err(e) => eprintln!("Failed to render directory tree: {}", e),
+
+        pattern=get_user_input();
+
+        if pattern.is_empty() {
+            break;
+        }
     }
+
+    normal_screen();
 }
