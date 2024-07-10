@@ -1,13 +1,37 @@
 use std::path::Path;
 use regex::Regex;
 use std::io::Write;
+use clap::{Parser, ValueEnum};
+use std::io;
+use std::io::BufRead;
 
+#[derive(ValueEnum, Clone, Debug)]
 enum Style {
     Compact,
     Full,
 }
 
-fn render_directory_tree(dir: &str, prefix: &str, pattern: Option<&str>, style: &Style) -> Result<(String, bool), std::io::Error> {
+#[derive(Parser, Debug)]
+#[clap(author = "Sam Christy", version = "1.0", about = "An interactive program for exploring directory trees.", long_about = None)]
+struct Args {
+    /// Directory to render
+    #[clap(short, long, default_value = ".")]
+    directory: String,
+
+    /// Pattern to match
+    #[clap(short, long)]
+    pattern: Option<String>,
+
+    /// Style of the tree
+    #[clap(value_enum, default_value_t = Style::Compact)]
+    style: Style,
+
+    /// Disable alternate screen buffer
+    #[clap(long, action)]
+    no_alternate_screen: bool,
+}
+
+fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) -> Result<(String, bool), std::io::Error> {
     let path = Path::new(dir);
     let mut output = String::new();
     let mut matched = false;
@@ -99,15 +123,19 @@ fn get_user_input() -> String {
 }
 
 fn main() {
-    let dir="my_dir";
-    let mut pattern=String::new();
+    let args = Args::parse();
 
-    alternate_screen();
+    if !args.no_alternate_screen {
+        alternate_screen();
+    }
+
+    let mut pattern = args.pattern.clone().unwrap_or_else(|| String::from(""));
+    let style = args.style.clone();
 
     loop {
-        match render_directory_tree(dir, "", Some(&pattern), &Style::Compact) {
+        match render_directory_tree(&args.directory, "", &pattern, &style) {
             Ok((tree, matched)) => {
-                println!("{dir}");
+                println!("{}", args.directory);
                 print!("{}", tree);
                 flush();
                 println!("Matched pattern: {}", matched);
@@ -115,12 +143,15 @@ fn main() {
             Err(e) => eprintln!("Failed to render directory tree: {}", e),
         }
 
-        pattern=get_user_input();
-
-        if pattern.is_empty() {
-            break;
+        match get_user_input() {
+            Some(input) => {
+                pattern = input;
+            }
+            None => break,
         }
     }
 
-    normal_screen();
+    if !args.no_alternate_screen {
+        normal_screen();
+    }
 }
