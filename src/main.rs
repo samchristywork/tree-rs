@@ -54,11 +54,16 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
         let is_last = i == num_entries - 1;
 
         let mut current_matched = false;
-        if let Some(p) = pattern {
-            let re = Regex::new(p).unwrap();
-            if re.is_match(&file_name_str) {
-                current_matched = true;
-                matched = true;
+        match Regex::new(pattern) {
+            Ok(re) => {
+                if re.is_match(&file_name_str) {
+                    current_matched = true;
+                    matched = true;
+                }
+            }
+            Err(_) => {
+                eprintln!("Invalid regex pattern: {}", pattern);
+                return Ok((output, false));
             }
         }
 
