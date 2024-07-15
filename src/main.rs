@@ -119,12 +119,22 @@ fn normal_screen() {
     flush();
 }
 
-fn get_user_input() -> String {
-    let mut input = String::new();
-    print!("Enter pattern to match (or leave empty to show all): ");
-    flush();
-    std::io::stdin().read_line(&mut input).unwrap();
-    input.trim().to_string()
+fn get_user_input() -> Option<String> {
+    let stdin = io::stdin();
+    let mut line = String::new();
+
+    match stdin.lock().read_line(&mut line) {
+        Ok(0) => {
+            return None;
+        }
+        Ok(_) => {
+            line.pop();
+            return Some(line);
+        }
+        Err(_) => {
+            return None;
+        }
+    }
 }
 
 fn main() {
