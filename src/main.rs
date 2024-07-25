@@ -22,12 +22,12 @@ struct Args {
     #[clap(short, long)]
     pattern: Option<String>,
 
-    /// Style of the tree
-    #[clap(value_enum, default_value_t = Style::Compact)]
-    style: Style,
+    /// Style to use for rendering (compact or full)
+    #[clap(short, long, default_value = "full")]
+    style: String,
 
     /// Disable alternate screen buffer
-    #[clap(long, action)]
+    #[clap(long, action, default_value_t = false)]
     no_alternate_screen: bool,
 }
 
@@ -137,6 +137,12 @@ fn get_user_input() -> Option<String> {
     }
 }
 
+fn cleanup(no_alternate_screen: bool) {
+    if !no_alternate_screen {
+        normal_screen();
+    }
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -145,7 +151,12 @@ fn main() {
     }
 
     let mut pattern = args.pattern.clone().unwrap_or_else(|| String::from(""));
-    let style = args.style.clone();
+
+    let style=match args.style.as_str() {
+        "compact" => Style::Compact,
+        "full" => Style::Full,
+        _ => Style::Full,
+    };
 
     loop {
         match render_directory_tree(&args.directory, "", &pattern, &style) {
@@ -166,7 +177,5 @@ fn main() {
         }
     }
 
-    if !args.no_alternate_screen {
-        normal_screen();
-    }
+    cleanup(args.no_alternate_screen);
 }
