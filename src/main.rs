@@ -31,6 +31,14 @@ struct Args {
     no_alternate_screen: bool,
 }
 
+fn cyan() -> String {
+    "\x1B[36m".to_string()
+}
+
+fn normal() -> String {
+    "\x1B[0m".to_string()
+}
+
 fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) -> Result<(String, bool), std::io::Error> {
     let path = Path::new(dir);
     let mut output = String::new();
@@ -96,7 +104,7 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
                 (Style::Full, true) => "└─",
                 (Style::Full, false) => "├─",
             };
-            let line = format!("{}{}{}\n", prefix, connector, file_name_str);
+            let line = format!("{}{}{}{}{}\n", prefix, connector, cyan(), file_name_str, normal());
             output.push_str(&line);
             output.push_str(&subtree);
         }
@@ -143,6 +151,11 @@ fn cleanup(no_alternate_screen: bool) {
     }
 }
 
+fn clear_screen() {
+    print!("\x1B[2J\x1B[H");
+    flush();
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -160,11 +173,14 @@ fn main() {
 
     loop {
         match render_directory_tree(&args.directory, "", &pattern, &style) {
-            Ok((tree, matched)) => {
-                println!("{}", args.directory);
+            Ok((tree, _matched)) => {
+                clear_screen();
+                println!("{}{}{}", cyan(), args.directory, normal());
                 print!("{}", tree);
                 flush();
-                println!("Matched pattern: {}", matched);
+                println!("");
+                print!("Pattern (current: '{}'): ", pattern);
+                flush();
             }
             Err(e) => eprintln!("Failed to render directory tree: {}", e),
         }
