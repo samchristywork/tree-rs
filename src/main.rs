@@ -4,6 +4,7 @@ use std::io::Write;
 use clap::{Parser, ValueEnum};
 use std::io;
 use std::io::BufRead;
+use termion;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Style {
@@ -166,6 +167,28 @@ fn clear_screen() {
     flush();
 }
 
+fn constrain_dimensions(tree: String, screen_size: (u16, u16)) -> String {
+    let max_width = screen_size.0 as usize;
+    let max_height = screen_size.1 as usize - 3;
+
+    let color_code_length=7 + 6;
+
+    let mut constrained_tree = String::new();
+    for line in tree.lines() {
+        if line.len() > max_width - color_code_length {
+            constrained_tree.push_str(&line[..max_width - color_code_length]);
+            constrained_tree.push('\n');
+        } else {
+            constrained_tree.push_str(line);
+            constrained_tree.push('\n');
+        }
+    }
+
+    constrained_tree = constrained_tree.lines().take(max_height).collect::<Vec<&str>>().join("\n");
+
+    constrained_tree
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -182,11 +205,13 @@ fn main() {
     };
 
     loop {
+        let screen_size = termion::terminal_size().unwrap_or((80, 24));
+
         match render_directory_tree(&args.directory, "", &pattern, &style) {
             Ok((tree, _matched)) => {
                 clear_screen();
                 println!("{}{}{}", cyan(), args.directory, normal());
-                print!("{}", tree);
+                print!("{}", constrain_dimensions(tree, screen_size));
                 flush();
                 println!("");
                 print!("Pattern (current: '{}'): ", pattern);
