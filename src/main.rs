@@ -83,6 +83,7 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
         let entry_path = entry.path();
         let mut subtree = String::new();
 
+        let mut subtree_matched = false;
         if entry_path.is_dir() {
             let new_prefix = if is_last {
                 match &style {
@@ -95,14 +96,16 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
                     Style::Full => format!("{}│ ", prefix),
                 }
             };
+
             let (subtree_result, sub_matched_result) = render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern, &style)?;
             subtree = subtree_result;
-            let sub_matched = sub_matched_result;
-            matched = matched || sub_matched;
-            current_matched = current_matched || sub_matched;
+            subtree_matched = sub_matched_result;
+            if sub_matched_result {
+                matched = true;
+            }
         }
 
-        if current_matched || matched {
+        if current_matched || subtree_matched {
             let connector = match (&style, is_last) {
                 (Style::Compact, true) => "└",
                 (Style::Compact, false) => "├",
