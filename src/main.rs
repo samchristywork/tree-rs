@@ -35,6 +35,10 @@ fn cyan() -> String {
     "\x1B[36m".to_string()
 }
 
+fn magenta() -> String {
+    "\x1B[35m".to_string()
+}
+
 fn normal() -> String {
     "\x1B[0m".to_string()
 }
@@ -104,7 +108,13 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
                 (Style::Full, true) => "└─",
                 (Style::Full, false) => "├─",
             };
-            let line = format!("{}{}{}{}{}\n", prefix, connector, cyan(), file_name_str, normal());
+
+            let color = match entry_path.is_dir() {
+                true => cyan(),
+                false => magenta(),
+            };
+
+            let line = format!("{}{}{}{}{}\n", prefix, connector, color, file_name_str, normal());
             output.push_str(&line);
             output.push_str(&subtree);
         }
