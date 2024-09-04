@@ -237,6 +237,7 @@ fn main() {
                 print!("{}", constrain_dimensions(tree, screen_size));
                 flush();
                 println!("");
+                println!("Ctrl+D to exit");
                 print!("Pattern (current: '{}'): ", pattern);
                 flush();
             }
