@@ -58,7 +58,18 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
         return Ok((output, false));
     }
 
-    let entries = std::fs::read_dir(path)?;
+    let entries = match std::fs::read_dir(path) {
+        Ok(entries) => entries,
+        Err(e) => {
+            if e.kind() == io::ErrorKind::PermissionDenied {
+                output.push_str(&format!("Error: Permission denied for directory '{}'.\n", dir));
+                return Ok((output, false));
+            } else {
+                return Err(e);
+            }
+        }
+    };
+
     let mut entries_vec: Vec<_> = entries.collect::<Result<_, _>>()?;
 
     entries_vec.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
