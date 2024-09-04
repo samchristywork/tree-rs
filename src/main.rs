@@ -40,6 +40,10 @@ fn magenta() -> String {
     "\x1B[35m".to_string()
 }
 
+fn yellow() -> String {
+    "\x1B[33m".to_string()
+}
+
 fn normal() -> String {
     "\x1B[0m".to_string()
 }
@@ -84,7 +88,9 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
         let mut subtree = String::new();
 
         let mut subtree_matched = false;
-        if entry_path.is_dir() {
+        let file_type = entry.file_type()?;
+
+        if file_type.is_dir() {
             let new_prefix = if is_last {
                 match &style {
                     Style::Compact => format!("{} ", prefix),
@@ -113,9 +119,12 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
                 (Style::Full, false) => "├─",
             };
 
-            let color = match entry_path.is_dir() {
-                true => cyan(),
-                false => magenta(),
+            let color = if file_type.is_symlink() {
+                yellow()
+            } else if file_type.is_dir() {
+                cyan()
+            } else {
+                magenta()
             };
 
             let line = format!("{}{}{}{}{}\n", prefix, connector, color, file_name_str, normal());
