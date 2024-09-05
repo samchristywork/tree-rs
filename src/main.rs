@@ -44,8 +44,39 @@ fn yellow() -> String {
     "\x1B[33m".to_string()
 }
 
+fn red() -> String {
+    "\x1B[31m".to_string()
+}
+
 fn normal() -> String {
     "\x1B[0m".to_string()
+}
+
+struct Line {
+    first_part: String,
+    last_part: String,
+    color: String,
+}
+
+impl Line {
+    fn length(&self) -> usize {
+        self.first_part.len() + self.last_part.len()
+    }
+
+    fn to_limited_string(&self, n: usize) -> String {
+        if self.length() <= n {
+            format!("{}{}{}", self.first_part, self.color, self.last_part) + &normal()
+        } else if self.first_part.len() < n {
+            format!(
+                "{}{}{}",
+                self.first_part,
+                self.color,
+                &self.last_part[..n - self.first_part.len()]
+            ) + &normal()
+        } else {
+            format!("{}{}{}", &self.first_part[..n], self.color, &self.last_part) + &normal()
+        }
+    }
 }
 
 fn render_directory_tree(
@@ -53,13 +84,17 @@ fn render_directory_tree(
     prefix: &str,
     pattern: &str,
     style: &Style,
-) -> Result<(Vec<String>, bool), std::io::Error> {
+) -> Result<(Vec<Line>, bool), std::io::Error> {
     let path = Path::new(dir);
-    let mut output: Vec<String> = Vec::new();
+    let mut output: Vec<Line> = Vec::new();
     let mut matched = false;
 
     if !path.is_dir() {
-        output.push(format!("Error: {} is not a directory.", dir));
+        output.push(Line {
+            first_part: format!("Error: {} is not a directory.", dir),
+            last_part: String::new(),
+            color: red(),
+        });
         return Ok((output, false));
     }
 
@@ -67,7 +102,11 @@ fn render_directory_tree(
         Ok(entries) => entries,
         Err(e) => {
             if e.kind() == io::ErrorKind::PermissionDenied {
-                output.push(format!("Error: Permission denied for directory '{}'.", dir));
+                output.push(Line {
+                    first_part: format!("Error: Permission denied for directory '{}'.", dir),
+                    last_part: String::new(),
+                    color: red(),
+                });
                 return Ok((output, false));
             } else {
                 return Err(e);
@@ -144,14 +183,11 @@ fn render_directory_tree(
                 magenta()
             };
 
-            let line = format!(
-                "{}{}{}{}{}",
-                prefix,
-                connector,
-                color,
-                file_name_str,
-                normal()
-            );
+            let line = Line {
+                first_part: format!("{}{}", prefix, connector),
+                last_part: format!("{}", file_name_str),
+                color: color,
+            };
             output.push(line);
             output.extend(subtree);
         }
@@ -203,28 +239,16 @@ fn clear_screen() {
     flush();
 }
 
-fn constrain_dimensions(tree: Vec<String>, screen_size: (u16, u16)) -> String {
+fn constrain_dimensions(tree: Vec<Line>, screen_size: (u16, u16)) -> String {
     let max_width = screen_size.0 as usize;
     let max_height = screen_size.1 as usize - 3;
 
-    let color_code_length = 7 + 6;
-
     let mut constrained_tree = String::new();
-    for line in tree {
-        if line.len() > max_width - color_code_length {
-            constrained_tree.push_str(&line[..max_width - color_code_length]);
-            constrained_tree.push('\n');
-        } else {
-            constrained_tree.push_str(&line);
-            constrained_tree.push('\n');
-        }
-    }
 
-    constrained_tree = constrained_tree
-        .lines()
-        .take(max_height)
-        .collect::<Vec<&str>>()
-        .join("\n");
+    for line in tree.iter().take(max_height) {
+        constrained_tree += line.to_limited_string(max_width).as_str();
+        constrained_tree += "\n";
+    }
 
     constrained_tree
 }
