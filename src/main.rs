@@ -48,13 +48,13 @@ fn normal() -> String {
     "\x1B[0m".to_string()
 }
 
-fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) -> Result<(String, bool), std::io::Error> {
+fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) -> Result<(Vec<String>, bool), std::io::Error> {
     let path = Path::new(dir);
-    let mut output = String::new();
+    let mut output: Vec<String> = Vec::new();
     let mut matched = false;
 
     if !path.is_dir() {
-        output.push_str(&format!("Error: {} is not a directory.\n", dir));
+        output.push(format!("Error: {} is not a directory.", dir));
         return Ok((output, false));
     }
 
@@ -62,7 +62,7 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
         Ok(entries) => entries,
         Err(e) => {
             if e.kind() == io::ErrorKind::PermissionDenied {
-                output.push_str(&format!("Error: Permission denied for directory '{}'.\n", dir));
+                output.push(format!("Error: Permission denied for directory '{}'.", dir));
                 return Ok((output, false));
             } else {
                 return Err(e);
@@ -96,7 +96,7 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
         }
 
         let entry_path = entry.path();
-        let mut subtree = String::new();
+        let mut subtree = Vec::new();
 
         let mut subtree_matched = false;
         let file_type = entry.file_type()?;
@@ -138,9 +138,9 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
                 magenta()
             };
 
-            let line = format!("{}{}{}{}{}\n", prefix, connector, color, file_name_str, normal());
-            output.push_str(&line);
-            output.push_str(&subtree);
+            let line = format!("{}{}{}{}{}", prefix, connector, color, file_name_str, normal());
+            output.push(line);
+            output.extend(subtree);
         }
     }
 
@@ -190,19 +190,19 @@ fn clear_screen() {
     flush();
 }
 
-fn constrain_dimensions(tree: String, screen_size: (u16, u16)) -> String {
+fn constrain_dimensions(tree: Vec<String>, screen_size: (u16, u16)) -> String {
     let max_width = screen_size.0 as usize;
     let max_height = screen_size.1 as usize - 3;
 
     let color_code_length=7 + 6;
 
     let mut constrained_tree = String::new();
-    for line in tree.lines() {
+    for line in tree {
         if line.len() > max_width - color_code_length {
             constrained_tree.push_str(&line[..max_width - color_code_length]);
             constrained_tree.push('\n');
         } else {
-            constrained_tree.push_str(line);
+            constrained_tree.push_str(&line);
             constrained_tree.push('\n');
         }
     }
