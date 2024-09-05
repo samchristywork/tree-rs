@@ -1,9 +1,9 @@
-use std::path::Path;
-use regex::Regex;
-use std::io::Write;
 use clap::{Parser, ValueEnum};
+use regex::Regex;
 use std::io;
 use std::io::BufRead;
+use std::io::Write;
+use std::path::Path;
 use termion;
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -48,7 +48,12 @@ fn normal() -> String {
     "\x1B[0m".to_string()
 }
 
-fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) -> Result<(Vec<String>, bool), std::io::Error> {
+fn render_directory_tree(
+    dir: &str,
+    prefix: &str,
+    pattern: &str,
+    style: &Style,
+) -> Result<(Vec<String>, bool), std::io::Error> {
     let path = Path::new(dir);
     let mut output: Vec<String> = Vec::new();
     let mut matched = false;
@@ -114,7 +119,8 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
                 }
             };
 
-            let (subtree_result, sub_matched_result) = render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern, &style)?;
+            let (subtree_result, sub_matched_result) =
+                render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern, &style)?;
             subtree = subtree_result;
             subtree_matched = sub_matched_result;
             if sub_matched_result {
@@ -138,7 +144,14 @@ fn render_directory_tree(dir: &str, prefix: &str, pattern: &str, style: &Style) 
                 magenta()
             };
 
-            let line = format!("{}{}{}{}{}", prefix, connector, color, file_name_str, normal());
+            let line = format!(
+                "{}{}{}{}{}",
+                prefix,
+                connector,
+                color,
+                file_name_str,
+                normal()
+            );
             output.push(line);
             output.extend(subtree);
         }
@@ -194,7 +207,7 @@ fn constrain_dimensions(tree: Vec<String>, screen_size: (u16, u16)) -> String {
     let max_width = screen_size.0 as usize;
     let max_height = screen_size.1 as usize - 3;
 
-    let color_code_length=7 + 6;
+    let color_code_length = 7 + 6;
 
     let mut constrained_tree = String::new();
     for line in tree {
@@ -207,7 +220,11 @@ fn constrain_dimensions(tree: Vec<String>, screen_size: (u16, u16)) -> String {
         }
     }
 
-    constrained_tree = constrained_tree.lines().take(max_height).collect::<Vec<&str>>().join("\n");
+    constrained_tree = constrained_tree
+        .lines()
+        .take(max_height)
+        .collect::<Vec<&str>>()
+        .join("\n");
 
     constrained_tree
 }
@@ -221,7 +238,7 @@ fn main() {
 
     let mut pattern = args.pattern.clone().unwrap_or_else(|| String::from(""));
 
-    let style=match args.style.as_str() {
+    let style = match args.style.as_str() {
         "compact" => Style::Compact,
         "full" => Style::Full,
         _ => Style::Full,
