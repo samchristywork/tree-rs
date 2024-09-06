@@ -91,8 +91,8 @@ fn render_directory_tree(
 
     if !path.is_dir() {
         output.push(Line {
-            first_part: format!("Error: {} is not a directory.", dir),
-            last_part: String::new(),
+            first_part: String::new(),
+            last_part: format!("Error: {} is not a directory.", dir),
             color: red(),
         });
         return Ok((output, false));
@@ -103,8 +103,8 @@ fn render_directory_tree(
         Err(e) => {
             if e.kind() == io::ErrorKind::PermissionDenied {
                 output.push(Line {
-                    first_part: format!("Error: Permission denied for directory '{}'.", dir),
-                    last_part: String::new(),
+                    first_part: String::new(),
+                    last_part: format!("Error: Permission denied for directory '{}'.", dir),
                     color: red(),
                 });
                 return Ok((output, false));
