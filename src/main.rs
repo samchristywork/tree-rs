@@ -1,10 +1,10 @@
 use clap::{Parser, ValueEnum};
 use regex::Regex;
 use std::io;
-use std::io::BufRead;
+use std::io::Read;
 use std::io::Write;
 use std::path::Path;
-use termion;
+use termion::raw::IntoRawMode;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Style {
@@ -116,7 +116,7 @@ fn render_directory_tree(
 
     let mut entries_vec: Vec<_> = entries.collect::<Result<_, _>>()?;
 
-    entries_vec.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    entries_vec.sort_by_key(|entry| entry.file_name());
 
     let num_entries = entries_vec.len();
 
@@ -159,7 +159,7 @@ fn render_directory_tree(
             };
 
             let (subtree_result, sub_matched_result) =
-                render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern, &style)?;
+                render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern, style)?;
             subtree = subtree_result;
             subtree_matched = sub_matched_result;
             if sub_matched_result {
@@ -186,7 +186,7 @@ fn render_directory_tree(
             let line = Line {
                 first_part: format!("{}{}", prefix, connector),
                 last_part: format!("{}", file_name_str),
-                color: color,
+                color,
             };
             output.push(line);
             output.extend(subtree);
@@ -210,24 +210,6 @@ fn normal_screen() {
     flush();
 }
 
-fn get_user_input() -> Option<String> {
-    let stdin = io::stdin();
-    let mut line = String::new();
-
-    match stdin.lock().read_line(&mut line) {
-        Ok(0) => {
-            return None;
-        }
-        Ok(_) => {
-            line.pop();
-            return Some(line);
-        }
-        Err(_) => {
-            return None;
-        }
-    }
-}
-
 fn cleanup(no_alternate_screen: bool) {
     if !no_alternate_screen {
         normal_screen();
@@ -247,7 +229,7 @@ fn constrain_dimensions(tree: Vec<Line>, screen_size: (u16, u16)) -> String {
 
     for line in tree.iter().take(max_height) {
         constrained_tree += line.to_limited_string(max_width).as_str();
-        constrained_tree += "\n";
+        constrained_tree += "\r\n";
     }
 
     constrained_tree
@@ -268,28 +250,50 @@ fn main() {
         _ => Style::Full,
     };
 
+    let term = termion::get_tty().expect("Failed to get terminal");
+    let _raw_term = term.into_raw_mode().expect("Failed to enter raw mode");
+
+    let mut buffer = [0; 1];
     loop {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
         match render_directory_tree(&args.directory, "", &pattern, &style) {
             Ok((tree, _matched)) => {
                 clear_screen();
-                println!("{}{}{}", cyan(), args.directory, normal());
+                print!("{}{}{}\r\n", cyan(), args.directory, normal());
                 print!("{}", constrain_dimensions(tree, screen_size));
                 flush();
-                println!("");
-                println!("Ctrl+D to exit");
+                print!("\r\n");
+                print!("Ctrl+D to exit\r\n");
                 print!("Pattern (current: '{}'): ", pattern);
                 flush();
             }
             Err(e) => eprintln!("Failed to render directory tree: {}", e),
         }
 
-        match get_user_input() {
-            Some(input) => {
-                pattern = input;
+        match io::stdin().read_exact(&mut buffer) {
+            Ok(_) => {
+                let char_value = buffer[0] as char;
+                match char_value as u8 {
+                    0x7f | 0x08 => {
+                        // Backspace
+                        if !pattern.is_empty() {
+                            pattern.pop();
+                        }
+                    }
+                    0x04 => {
+                        // Ctrl+D
+                        break;
+                    }
+                    _ => {
+                        pattern.push(char_value);
+                    }
+                }
             }
-            None => break,
+            Err(e) => {
+                eprintln!("Error reading input: {e}");
+                break;
+            }
         }
     }
 
