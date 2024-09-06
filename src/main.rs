@@ -295,6 +295,34 @@ fn main() {
                 break;
             }
         }
+
+        if pattern.len() >= 4 {
+            match pattern
+                .as_bytes()
+                .iter()
+                .rev()
+                .take(4)
+                .rev()
+                .cloned()
+                .collect::<Vec<u8>>()[..]
+            {
+                [0x1b, 0x5b, 0x35, 0x7e] => {
+                    // Page Up
+                    pattern.pop();
+                    pattern.pop();
+                    pattern.pop();
+                    pattern.pop();
+                }
+                [0x1b, 0x5b, 0x36, 0x7e] => {
+                    // Page Down
+                    pattern.pop();
+                    pattern.pop();
+                    pattern.pop();
+                    pattern.pop();
+                }
+                _ => {}
+            }
+        }
     }
 
     cleanup(args.no_alternate_screen);
