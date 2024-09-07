@@ -223,7 +223,7 @@ fn clear_screen() {
 
 fn constrain_dimensions(tree: Vec<Line>, screen_size: (u16, u16)) -> String {
     let max_width = screen_size.0 as usize;
-    let max_height = screen_size.1 as usize - 3;
+    let max_height = screen_size.1 as usize - 5;
 
     let mut constrained_tree = String::new();
 
@@ -265,6 +265,10 @@ fn main() {
                 flush();
                 print!("\r\n");
                 print!("Ctrl+D to exit\r\n");
+                for byte in pattern.as_bytes() {
+                    print!("{:02x} ", byte);
+                }
+                print!("\r\n");
                 print!("Pattern (current: '{}'): ", pattern);
                 flush();
             }
@@ -280,6 +284,10 @@ fn main() {
                         if !pattern.is_empty() {
                             pattern.pop();
                         }
+                    }
+                    0x15 => {
+                        // Ctrl+U
+                        pattern.clear();
                     }
                     0x04 => {
                         // Ctrl+D
