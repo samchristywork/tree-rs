@@ -216,12 +216,11 @@ fn cleanup(no_alternate_screen: bool) {
     }
 }
 
-fn clear_screen() {
-    print!("\x1B[2J\x1B[H");
-    flush();
+fn go_to_top_left() {
+    print!("\x1B[H");
 }
 
-fn constrain_dimensions(tree: Vec<Line>, screen_size: (u16, u16)) -> String {
+fn draw_tree(tree: Vec<Line>, screen_size: (u16, u16)) -> String {
     let max_width = screen_size.0 as usize;
     let max_height = screen_size.1 as usize - 5;
 
@@ -229,6 +228,17 @@ fn constrain_dimensions(tree: Vec<Line>, screen_size: (u16, u16)) -> String {
 
     for line in tree.iter().take(max_height) {
         constrained_tree += line.to_limited_string(max_width).as_str();
+
+        let remaining_space = max_width.saturating_sub(line.length());
+        if remaining_space > 0 {
+            constrained_tree += &" ".repeat(remaining_space);
+        }
+
+        constrained_tree += "\r\n";
+    }
+
+    for _ in tree.len()..max_height {
+        constrained_tree += &" ".repeat(max_width);
         constrained_tree += "\r\n";
     }
 
@@ -246,7 +256,6 @@ fn main() {
 
     let style = match args.style.as_str() {
         "compact" => Style::Compact,
-        "full" => Style::Full,
         _ => Style::Full,
     };
 
@@ -259,24 +268,24 @@ fn main() {
 
         match render_directory_tree(&args.directory, "", &pattern, &style) {
             Ok((tree, _matched)) => {
-                clear_screen();
+                go_to_top_left();
                 print!("{}{}{}\r\n", cyan(), args.directory, normal());
-                print!("{}", constrain_dimensions(tree, screen_size));
-                flush();
+                print!("{}", draw_tree(tree, screen_size));
                 print!("\r\n");
                 print!("Ctrl+D to exit\r\n");
                 for byte in pattern.as_bytes() {
-                    print!("{:02x} ", byte);
+                    print!("{byte:02x} ");
                 }
                 print!("\r\n");
-                print!("Pattern (current: '{}'): ", pattern);
                 flush();
             }
             Err(e) => eprintln!("Failed to render directory tree: {}", e),
         }
 
+        print!("Pattern (current: '{pattern}'): ");
+        flush();
         match io::stdin().read_exact(&mut buffer) {
-            Ok(_) => {
+            Ok(()) => {
                 let char_value = buffer[0] as char;
                 match char_value as u8 {
                     0x7f | 0x08 => {
@@ -311,7 +320,7 @@ fn main() {
                 .rev()
                 .take(4)
                 .rev()
-                .cloned()
+                .copied()
                 .collect::<Vec<u8>>()[..]
             {
                 [0x1b, 0x5b, 0x35, 0x7e] => {
