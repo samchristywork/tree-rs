@@ -220,7 +220,17 @@ fn go_to_top_left() {
     print!("\x1B[H");
 }
 
-fn draw_tree(tree: Vec<Line>, screen_size: (u16, u16)) -> String {
+fn fixed_length_string(s: &str, n: usize) -> String {
+    if s.len() < n {
+        format!("{}{}", s, " ".repeat(n - s.len()))
+    } else if s.len() > n {
+        s[..n].to_string()
+    } else {
+        s.to_string()
+    }
+}
+
+fn draw_tree(tree: &[Line], screen_size: (u16, u16)) -> String {
     let max_width = screen_size.0 as usize;
     let max_height = screen_size.1 as usize - 5;
 
@@ -269,20 +279,36 @@ fn main() {
         match render_directory_tree(&args.directory, "", &pattern, &style) {
             Ok((tree, _matched)) => {
                 go_to_top_left();
-                print!("{}{}{}\r\n", cyan(), args.directory, normal());
-                print!("{}", draw_tree(tree, screen_size));
+                print!(
+                    "{}{}{}\r\n",
+                    cyan(),
+                    fixed_length_string(args.directory.as_str(), screen_size.0 as usize),
+                    normal()
+                );
+                print!("{}", draw_tree(&tree, screen_size));
                 print!("\r\n");
-                print!("Ctrl+D to exit\r\n");
+                print!(
+                    "{}\r\n",
+                    fixed_length_string("Ctrl+D to exit", screen_size.0 as usize)
+                );
+                print!("{}\r", &" ".repeat(screen_size.0 as usize));
+                print!("Hex: ");
                 for byte in pattern.as_bytes() {
-                    print!("{byte:02x} ");
+                    print!("0x{byte:02x} ");
                 }
                 print!("\r\n");
                 flush();
             }
-            Err(e) => eprintln!("Failed to render directory tree: {}", e),
+            Err(e) => eprintln!("Failed to render directory tree: {e}"),
         }
 
-        print!("Pattern (current: '{pattern}'): ");
+        print!(
+            "{}",
+            fixed_length_string(
+                format!("Pattern: '{pattern}'").as_str(),
+                screen_size.0 as usize
+            )
+        );
         flush();
         match io::stdin().read_exact(&mut buffer) {
             Ok(()) => {
