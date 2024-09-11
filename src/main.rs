@@ -92,7 +92,7 @@ fn render_directory_tree(
     if !path.is_dir() {
         output.push(Line {
             first_part: String::new(),
-            last_part: format!("Error: {} is not a directory.", dir),
+            last_part: format!("Error: {dir} is not a directory."),
             color: red(),
         });
         return Ok((output, false));
@@ -104,19 +104,18 @@ fn render_directory_tree(
             if e.kind() == io::ErrorKind::PermissionDenied {
                 output.push(Line {
                     first_part: String::new(),
-                    last_part: format!("Error: Permission denied for directory '{}'.", dir),
+                    last_part: format!("Error: Permission denied for directory '{dir}'."),
                     color: red(),
                 });
                 return Ok((output, false));
-            } else {
-                return Err(e);
             }
+            return Err(e);
         }
     };
 
     let mut entries_vec: Vec<_> = entries.collect::<Result<_, _>>()?;
 
-    entries_vec.sort_by_key(|entry| entry.file_name());
+    entries_vec.sort_by_key(std::fs::DirEntry::file_name);
 
     let num_entries = entries_vec.len();
 
@@ -126,17 +125,14 @@ fn render_directory_tree(
         let is_last = i == num_entries - 1;
 
         let mut current_matched = false;
-        match Regex::new(pattern) {
-            Ok(re) => {
-                if re.is_match(&file_name_str) {
-                    current_matched = true;
-                    matched = true;
-                }
+        if let Ok(re) = Regex::new(pattern) {
+            if re.is_match(&file_name_str) {
+                current_matched = true;
+                matched = true;
             }
-            Err(_) => {
-                eprintln!("Invalid regex pattern: {}", pattern);
-                return Ok((output, false));
-            }
+        } else {
+            eprintln!("Invalid regex pattern: {pattern}");
+            return Ok((output, false));
         }
 
         let entry_path = entry.path();
@@ -148,18 +144,22 @@ fn render_directory_tree(
         if file_type.is_dir() {
             let new_prefix = if is_last {
                 match &style {
-                    Style::Compact => format!("{} ", prefix),
-                    Style::Full => format!("{}  ", prefix),
+                    Style::Compact => format!("{prefix} "),
+                    Style::Full => format!("{prefix}  "),
                 }
             } else {
                 match &style {
-                    Style::Compact => format!("{}│", prefix),
-                    Style::Full => format!("{}│ ", prefix),
+                    Style::Compact => format!("{prefix}│"),
+                    Style::Full => format!("{prefix}│ "),
                 }
             };
 
-            let (subtree_result, sub_matched_result) =
-                render_directory_tree(entry_path.to_str().unwrap(), &new_prefix, pattern, style)?;
+            let (subtree_result, sub_matched_result) = render_directory_tree(
+                entry_path.to_str().expect("Invalid path"),
+                &new_prefix,
+                pattern,
+                style,
+            )?;
             subtree = subtree_result;
             subtree_matched = sub_matched_result;
             if sub_matched_result {
@@ -184,8 +184,8 @@ fn render_directory_tree(
             };
 
             let line = Line {
-                first_part: format!("{}{}", prefix, connector),
-                last_part: format!("{}", file_name_str),
+                first_part: format!("{prefix}{connector}"),
+                last_part: format!("{file_name_str}"),
                 color,
             };
             output.push(line);
@@ -197,7 +197,7 @@ fn render_directory_tree(
 }
 
 fn flush() {
-    std::io::stdout().flush().unwrap();
+    std::io::stdout().flush().expect("Failed to flush stdout");
 }
 
 fn alternate_screen() {
@@ -221,12 +221,10 @@ fn go_to_top_left() {
 }
 
 fn fixed_length_string(s: &str, n: usize) -> String {
-    if s.len() < n {
-        format!("{}{}", s, " ".repeat(n - s.len()))
-    } else if s.len() > n {
-        s[..n].to_string()
-    } else {
-        s.to_string()
+    match s.len().cmp(&n) {
+        std::cmp::Ordering::Less => format!("{}{}", s, " ".repeat(n - s.len())),
+        std::cmp::Ordering::Greater => s[..n].to_string(),
+        std::cmp::Ordering::Equal => s.to_string(),
     }
 }
 
@@ -262,7 +260,7 @@ fn main() {
         alternate_screen();
     }
 
-    let mut pattern = args.pattern.clone().unwrap_or_else(|| String::from(""));
+    let mut pattern = args.pattern.clone().unwrap_or_else(String::new);
 
     let style = match args.style.as_str() {
         "compact" => Style::Compact,
