@@ -79,7 +79,7 @@ impl Line {
     }
 }
 
-fn render_directory_tree(
+fn build_directory_tree(
     dir: &str,
     prefix: &str,
     pattern: &str,
@@ -154,7 +154,7 @@ fn render_directory_tree(
                 }
             };
 
-            let (subtree_result, sub_matched_result) = render_directory_tree(
+            let (subtree_result, sub_matched_result) = build_directory_tree(
                 entry_path.to_str().expect("Invalid path"),
                 &new_prefix,
                 pattern,
@@ -216,8 +216,8 @@ fn cleanup(no_alternate_screen: bool) {
     }
 }
 
-fn go_to_top_left() {
-    print!("\x1B[H");
+fn set_cursor_position(x: u16, y: u16) {
+    print!("\x1B[{y};{x}H");
 }
 
 fn fixed_length_string(s: &str, n: usize) -> String {
@@ -253,47 +253,43 @@ fn draw_tree(tree: &[Line], screen_size: (u16, u16)) -> String {
     constrained_tree
 }
 
-fn go_to_bottom_minus_three(height: u16) {
-    print!("\x1B[{};0H", height - 3);
-}
+fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
+    let mut hex = String::new();
+    for byte in pattern.as_bytes() {
+        hex.push_str(&format!("0x{byte:02x} "));
+    }
 
-fn draw_input(pattern: &str, screen_size: (u16, u16)) {
-    go_to_bottom_minus_three(screen_size.1);
-    print!(
-        "{}",
+    let hex = hex.as_str();
+    format!(
+        "{}\r\n{}\r\n{}",
+        fixed_length_string(hex, screen_size.0 as usize),
         fixed_length_string(
             format!("Pattern: '{pattern}'").as_str(),
             screen_size.0 as usize
-        )
-    );
-    flush();
+        ),
+        fixed_length_string("Ctrl+D to exit", screen_size.0 as usize)
+    )
 }
 
-fn draw_data(args: &Args, pattern: &str, screen_size: (u16, u16), style: &Style) {
-    match render_directory_tree(&args.directory, "", &pattern, &style) {
+fn render_data(args: &Args, pattern: &str, screen_size: (u16, u16), style: &Style) -> String {
+    match build_directory_tree(&args.directory, "", pattern, style) {
         Ok((tree, _matched)) => {
-            go_to_top_left();
-            print!(
-                "{}{}{}\r\n",
+            format!(
+                "{}{}{}\r\n{}\r\n",
                 cyan(),
                 fixed_length_string(args.directory.as_str(), screen_size.0 as usize),
-                normal()
-            );
-            print!("{}", draw_tree(&tree, screen_size));
-            print!("\r\n");
-            print!(
-                "{}\r\n",
-                fixed_length_string("Ctrl+D to exit", screen_size.0 as usize)
-            );
-            print!("{}\r", &" ".repeat(screen_size.0 as usize));
-            print!("Hex: ");
-            for byte in pattern.as_bytes() {
-                print!("0x{byte:02x} ");
-            }
-            print!("\r\n");
-            flush();
+                normal(),
+                draw_tree(&tree, screen_size),
+            )
         }
-        Err(e) => eprintln!("Failed to render directory tree: {e}"),
+        Err(e) => {
+            format!(
+                "{}Error: Failed to build directory tree for '{}'.\r\n{}\r\n",
+                red(),
+                args.directory,
+                e
+            )
+        }
     }
 }
 
@@ -317,9 +313,13 @@ fn main() {
     loop {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
-        draw_data(&args, &pattern, screen_size, &style);
+        set_cursor_position(1, 1);
+        print!("{}", render_data(&args, &pattern, screen_size, &style));
+        flush();
 
-        draw_input(pattern.as_str(), screen_size);
+        set_cursor_position(1, screen_size.1.saturating_sub(2));
+        print!("{}", render_input(pattern.as_str(), screen_size));
+        flush();
 
         let mut buffer = [0; 1];
         match io::stdin().read_exact(&mut buffer) {
