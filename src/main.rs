@@ -310,6 +310,8 @@ fn main() {
     let term = termion::get_tty().expect("Failed to get terminal");
     let _raw_term = term.into_raw_mode().expect("Failed to enter raw mode");
 
+    let mut result = String::new();
+
     loop {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
@@ -338,6 +340,11 @@ fn main() {
                     }
                     0x04 => {
                         // Ctrl+D
+                        break;
+                    }
+                    b'\r' => {
+                        // Enter
+                        result = pattern;
                         break;
                     }
                     _ => {
@@ -380,4 +387,10 @@ fn main() {
         }
     }
     cleanup(args.no_alternate_screen);
+
+    if result.is_empty() {
+        println!("No output generated.");
+    } else {
+        println!("{result}");
+    }
 }
