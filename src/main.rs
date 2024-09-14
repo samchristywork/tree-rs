@@ -1,9 +1,10 @@
 use clap::{Parser, ValueEnum};
 use regex::Regex;
+use std::fs;
 use std::io;
 use std::io::Read;
 use std::io::Write;
-use std::path::Path;
+use std::path::PathBuf;
 use termion::raw::IntoRawMode;
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -71,121 +72,151 @@ impl Line {
     }
 }
 
-fn build_directory_tree(
-    dir: &str,
-    prefix: &str,
-    pattern: &str,
-    style: &Style,
-) -> Result<(Vec<Line>, bool), std::io::Error> {
-    let path = Path::new(dir);
-    let mut output: Vec<Line> = Vec::new();
-    let mut matched = false;
+struct DirectoryNode {
+    path: PathBuf,
+    children: Vec<DirectoryNode>,
+    matched: bool,
+}
+
+fn build_directory_tree_data(dir: &str, pattern: &str) -> Result<DirectoryNode, std::io::Error> {
+    let path = PathBuf::from(dir);
+    let mut node = DirectoryNode {
+        path: path.clone(),
+        children: Vec::new(),
+        matched: false,
+    };
 
     if !path.is_dir() {
-        output.push(Line {
-            first_part: String::new(),
-            last_part: format!("Error: {dir} is not a directory."),
-            color: red(),
-        });
-        return Ok((output, false));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Error: {dir} is not a directory."),
+        ));
     }
 
-    let entries = match std::fs::read_dir(path) {
+    let entries = match fs::read_dir(&path) {
         Ok(entries) => entries,
         Err(e) => {
             if e.kind() == io::ErrorKind::PermissionDenied {
-                output.push(Line {
-                    first_part: String::new(),
-                    last_part: format!("Error: Permission denied for directory '{dir}'."),
-                    color: red(),
-                });
-                return Ok((output, false));
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    format!("Error: Permission denied for directory '{dir}'."),
+                ));
             }
             return Err(e);
         }
     };
 
     let mut entries_vec: Vec<_> = entries.collect::<Result<_, _>>()?;
-
     entries_vec.sort_by_key(std::fs::DirEntry::file_name);
 
-    let num_entries = entries_vec.len();
+    let re = match Regex::new(pattern) {
+        Ok(re) => re,
+        Err(e) => {
+            eprintln!("Invalid regex pattern: {pattern}: {e}");
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("Invalid regex pattern: {e}"),
+            ));
+        }
+    };
 
-    for (i, entry) in entries_vec.iter().enumerate() {
+    for entry in entries_vec {
         let file_name = entry.file_name();
         let file_name_str = file_name.to_string_lossy();
-        let is_last = i == num_entries - 1;
-
-        let mut current_matched = false;
-        if let Ok(re) = Regex::new(pattern) {
-            if re.is_match(&file_name_str) {
-                current_matched = true;
-                matched = true;
-            }
-        } else {
-            eprintln!("Invalid regex pattern: {pattern}");
-            return Ok((output, false));
-        }
-
         let entry_path = entry.path();
-        let mut subtree = Vec::new();
-
-        let mut subtree_matched = false;
         let file_type = entry.file_type()?;
 
+        let current_matched = re.is_match(&file_name_str);
+
         if file_type.is_dir() {
-            let new_prefix = if is_last {
-                match &style {
-                    Style::Compact => format!("{prefix} "),
-                    Style::Full => format!("{prefix}  "),
-                }
-            } else {
-                match &style {
-                    Style::Compact => format!("{prefix}│"),
-                    Style::Full => format!("{prefix}│ "),
-                }
-            };
-
-            let (subtree_result, sub_matched_result) = build_directory_tree(
-                entry_path.to_str().expect("Invalid path"),
-                &new_prefix,
+            let child_node = build_directory_tree_data(
+                entry_path
+                    .to_str()
+                    .expect("Failed to convert path to string"),
                 pattern,
-                style,
             )?;
-            subtree = subtree_result;
-            subtree_matched = sub_matched_result;
-            if sub_matched_result {
-                matched = true;
+            if current_matched || child_node.matched {
+                node.children.push(child_node);
+                node.matched = true;
             }
-        }
-
-        if current_matched || subtree_matched {
-            let connector = match (&style, is_last) {
-                (Style::Compact, true) => "└",
-                (Style::Compact, false) => "├",
-                (Style::Full, true) => "└─",
-                (Style::Full, false) => "├─",
-            };
-
-            let color = if file_type.is_symlink() {
-                yellow()
-            } else if file_type.is_dir() {
-                cyan()
-            } else {
-                magenta()
-            };
-
-            let line = Line {
-                first_part: format!("{prefix}{connector}"),
-                last_part: format!("{file_name_str}"),
-                color,
-            };
-            output.push(line);
-            output.extend(subtree);
+        } else if current_matched {
+            node.children.push(DirectoryNode {
+                path: entry_path,
+                children: Vec::new(),
+                matched: true,
+            });
+            node.matched = true;
         }
     }
 
-    Ok((output, matched))
+    Ok(node)
+}
+
+fn render_directory_tree(
+    node: &DirectoryNode,
+    prefix: &str,
+    is_last: bool,
+    style: &Style,
+    lines: &mut Vec<Line>,
+) {
+    if !node.matched && node.children.is_empty() {
+        return;
+    }
+
+    let file_name = node
+        .path
+        .file_name()
+        .expect("Failed to get file name")
+        .to_string_lossy();
+
+    let connector = match (style, is_last) {
+        (Style::Compact, true) => "└",
+        (Style::Compact, false) => "├",
+        (Style::Full, true) => "└─",
+        (Style::Full, false) => "├─",
+    };
+
+    let color = if fs::symlink_metadata(&node.path)
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+    {
+        yellow()
+    } else if node.path.is_dir() {
+        cyan()
+    } else {
+        magenta()
+    };
+
+    let line = Line {
+        first_part: format!("{prefix}{connector}"),
+        last_part: format!("{file_name}"),
+        color,
+    };
+    lines.push(line);
+
+    let num_children = node.children.len();
+    for (i, child) in node.children.iter().enumerate() {
+        let is_last_child = i == num_children - 1;
+        let new_prefix = if is_last {
+            match style {
+                Style::Compact => format!("{prefix} "),
+                Style::Full => format!("{prefix}  "),
+            }
+        } else {
+            match style {
+                Style::Compact => format!("{prefix}│"),
+                Style::Full => format!("{prefix}│ "),
+            }
+        };
+
+        render_directory_tree(child, &new_prefix, is_last_child, style, lines);
+    }
+}
+
+fn render_directory(directory_tree: &DirectoryNode, style: &Style) -> Vec<Line> {
+    let mut lines = Vec::new();
+    render_directory_tree(directory_tree, "", true, style, &mut lines);
+    lines
 }
 
 fn flush() {
@@ -257,26 +288,21 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
     )
 }
 
-fn render_data(directory: &str, pattern: &str, screen_size: (u16, u16), style: &Style) -> String {
-    match build_directory_tree(directory, "", pattern, style) {
-        Ok((tree, _matched)) => {
-            format!(
-                "{}{}{}\r\n{}\r\n",
-                cyan(),
-                fixed_length_string(directory, screen_size.0 as usize),
-                normal(),
-                draw_tree(&tree, screen_size),
-            )
-        }
-        Err(e) => {
-            format!(
-                "{}Error: Failed to build directory tree for '{}'.\r\n{}\r\n",
-                red(),
-                directory,
-                e
-            )
-        }
-    }
+fn render_data(
+    directory: &str,
+    pattern: &str,
+    screen_size: (u16, u16),
+    style: &Style,
+) -> Result<String, std::io::Error> {
+    let directory_tree = build_directory_tree_data(directory, pattern)?;
+    let tree = render_directory(&directory_tree, style);
+    Ok(format!(
+        "{}{}{}\r\n{}\r\n",
+        cyan(),
+        fixed_length_string(directory, screen_size.0 as usize),
+        normal(),
+        draw_tree(&tree, screen_size),
+    ))
 }
 
 fn main_loop(directory: &str, style: &Style) -> String {
@@ -289,7 +315,17 @@ fn main_loop(directory: &str, style: &Style) -> String {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
         set_cursor_position(1, 1);
-        print!("{}", render_data(directory, &pattern, screen_size, style));
+        match render_data(directory, &pattern, screen_size, style) {
+            Ok(output) => print!("{output}"),
+            Err(e) => {
+                print!(
+                    "{}Error: Failed to render directory: {}\r\n{}",
+                    red(),
+                    e,
+                    normal()
+                );
+            }
+        }
         set_cursor_position(1, screen_size.1.saturating_sub(2));
         print!("{}", render_input(pattern.as_str(), screen_size));
         flush();
