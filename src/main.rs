@@ -19,17 +19,9 @@ struct Args {
     #[clap(short, long, default_value = ".")]
     directory: String,
 
-    /// Pattern to match
-    #[clap(short, long)]
-    pattern: Option<String>,
-
     /// Style to use for rendering (compact or full)
     #[clap(short, long, default_value = "full")]
     style: String,
-
-    /// Disable alternate screen buffer
-    #[clap(long, action, default_value_t = false)]
-    no_alternate_screen: bool,
 }
 
 fn cyan() -> String {
@@ -210,12 +202,6 @@ fn normal_screen() {
     flush();
 }
 
-fn cleanup(no_alternate_screen: bool) {
-    if !no_alternate_screen {
-        normal_screen();
-    }
-}
-
 fn set_cursor_position(x: u16, y: u16) {
     print!("\x1B[{y};{x}H");
 }
@@ -271,13 +257,13 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
     )
 }
 
-fn render_data(args: &Args, pattern: &str, screen_size: (u16, u16), style: &Style) -> String {
-    match build_directory_tree(&args.directory, "", pattern, style) {
+fn render_data(directory: &str, pattern: &str, screen_size: (u16, u16), style: &Style) -> String {
+    match build_directory_tree(directory, "", pattern, style) {
         Ok((tree, _matched)) => {
             format!(
                 "{}{}{}\r\n{}\r\n",
                 cyan(),
-                fixed_length_string(args.directory.as_str(), screen_size.0 as usize),
+                fixed_length_string(directory, screen_size.0 as usize),
                 normal(),
                 draw_tree(&tree, screen_size),
             )
@@ -286,39 +272,24 @@ fn render_data(args: &Args, pattern: &str, screen_size: (u16, u16), style: &Styl
             format!(
                 "{}Error: Failed to build directory tree for '{}'.\r\n{}\r\n",
                 red(),
-                args.directory,
+                directory,
                 e
             )
         }
     }
 }
 
-fn main() {
-    let args = Args::parse();
-
-    if !args.no_alternate_screen {
-        alternate_screen();
-    }
-
-    let mut pattern = args.pattern.clone().unwrap_or_else(String::new);
-
-    let style = match args.style.as_str() {
-        "compact" => Style::Compact,
-        _ => Style::Full,
-    };
+fn main_loop(directory: &str, style: &Style) -> String {
+    let mut pattern = String::new();
 
     let term = termion::get_tty().expect("Failed to get terminal");
     let _raw_term = term.into_raw_mode().expect("Failed to enter raw mode");
-
-    let mut result = String::new();
 
     loop {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
         set_cursor_position(1, 1);
-        print!("{}", render_data(&args, &pattern, screen_size, &style));
-        flush();
-
+        print!("{}", render_data(directory, &pattern, screen_size, style));
         set_cursor_position(1, screen_size.1.saturating_sub(2));
         print!("{}", render_input(pattern.as_str(), screen_size));
         flush();
@@ -340,11 +311,11 @@ fn main() {
                     }
                     0x04 => {
                         // Ctrl+D
+                        pattern.clear();
                         break;
                     }
                     b'\r' => {
                         // Enter
-                        result = pattern;
                         break;
                     }
                     _ => {
@@ -386,7 +357,23 @@ fn main() {
             }
         }
     }
-    cleanup(args.no_alternate_screen);
+
+    pattern
+}
+
+fn main() {
+    let args = Args::parse();
+
+    let style = match args.style.as_str() {
+        "compact" => Style::Compact,
+        _ => Style::Full,
+    };
+
+    alternate_screen();
+
+    let result = main_loop(&args.directory, &style);
+
+    normal_screen();
 
     if result.is_empty() {
         println!("No output generated.");
