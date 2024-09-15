@@ -78,7 +78,7 @@ struct DirectoryNode {
     matched: bool,
 }
 
-fn build_directory_tree_data(dir: &str, pattern: &str) -> Result<DirectoryNode, std::io::Error> {
+fn build_directory_tree_data(dir: &str) -> Result<DirectoryNode, std::io::Error> {
     let path = PathBuf::from(dir);
     let mut node = DirectoryNode {
         path: path.clone(),
@@ -109,43 +109,23 @@ fn build_directory_tree_data(dir: &str, pattern: &str) -> Result<DirectoryNode, 
     let mut entries_vec: Vec<_> = entries.collect::<Result<_, _>>()?;
     entries_vec.sort_by_key(std::fs::DirEntry::file_name);
 
-    let re = match Regex::new(pattern) {
-        Ok(re) => re,
-        Err(e) => {
-            eprintln!("Invalid regex pattern: {pattern}: {e}");
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Invalid regex pattern: {e}"),
-            ));
-        }
-    };
-
     for entry in entries_vec {
-        let file_name = entry.file_name();
-        let file_name_str = file_name.to_string_lossy();
         let entry_path = entry.path();
         let file_type = entry.file_type()?;
-
-        let current_matched = re.is_match(&file_name_str);
 
         if file_type.is_dir() {
             let child_node = build_directory_tree_data(
                 entry_path
                     .to_str()
                     .expect("Failed to convert path to string"),
-                pattern,
             )?;
-            if current_matched || child_node.matched {
-                node.children.push(child_node);
-                node.matched = true;
-            }
-        } else if current_matched {
+            node.children.push(child_node);
+        } else {
             node.children.push(DirectoryNode {
                 path: entry_path,
                 children: Vec::new(),
-                matched: true,
+                matched: false,
             });
-            node.matched = true;
         }
     }
 
@@ -159,7 +139,7 @@ fn render_directory_tree(
     style: &Style,
     lines: &mut Vec<Line>,
 ) {
-    if !node.matched && node.children.is_empty() {
+    if !node.matched {
         return;
     }
 
@@ -211,12 +191,6 @@ fn render_directory_tree(
 
         render_directory_tree(child, &new_prefix, is_last_child, style, lines);
     }
-}
-
-fn render_directory(directory_tree: &DirectoryNode, style: &Style) -> Vec<Line> {
-    let mut lines = Vec::new();
-    render_directory_tree(directory_tree, "", true, style, &mut lines);
-    lines
 }
 
 fn flush() {
@@ -289,20 +263,40 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
 }
 
 fn render_data(
-    directory: &str,
-    pattern: &str,
+    directory_tree: &DirectoryNode,
     screen_size: (u16, u16),
     style: &Style,
 ) -> Result<String, std::io::Error> {
-    let directory_tree = build_directory_tree_data(directory, pattern)?;
-    let tree = render_directory(&directory_tree, style);
+    let mut lines = Vec::new();
+    render_directory_tree(directory_tree, "", true, style, &mut lines);
+
     Ok(format!(
         "{}{}{}\r\n{}\r\n",
         cyan(),
-        fixed_length_string(directory, screen_size.0 as usize),
+        fixed_length_string(
+            directory_tree.path.to_str().unwrap_or(""),
+            screen_size.0 as usize
+        ),
         normal(),
-        draw_tree(&tree, screen_size),
+        draw_tree(&lines, screen_size),
     ))
+}
+
+fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
+    let mut matched = re.is_match(
+        node.path
+            .file_name()
+            .expect("Failed to get file name")
+            .to_string_lossy()
+            .as_ref(),
+    );
+
+    for child in node.children.iter_mut() {
+        matched |= mark_matched_nodes(child, re);
+    }
+
+    node.matched = matched;
+    matched
 }
 
 fn main_loop(directory: &str, style: &Style) -> String {
@@ -311,11 +305,27 @@ fn main_loop(directory: &str, style: &Style) -> String {
     let term = termion::get_tty().expect("Failed to get terminal");
     let _raw_term = term.into_raw_mode().expect("Failed to enter raw mode");
 
+    let mut directory_tree =
+        build_directory_tree_data(directory).expect("Failed to build directory tree");
     loop {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
+        let re = match Regex::new(&pattern) {
+            Ok(re) => re,
+            Err(e) => {
+                return format!(
+                    "{}Error: Failed to compile regex: {}\r\n{}",
+                    red(),
+                    e,
+                    normal()
+                );
+            }
+        };
+
+        mark_matched_nodes(&mut directory_tree, &re);
+
         set_cursor_position(1, 1);
-        match render_data(directory, &pattern, screen_size, style) {
+        match render_data(&directory_tree, screen_size, style) {
             Ok(output) => print!("{output}"),
             Err(e) => {
                 print!(
