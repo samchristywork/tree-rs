@@ -137,11 +137,12 @@ fn render_directory_tree(
     prefix: &str,
     is_last: bool,
     style: &Style,
-    lines: &mut Vec<Line>,
-) {
+) -> Vec<Line> {
     if !node.matched {
-        return;
+        return vec![];
     }
+
+    let mut lines = Vec::new();
 
     let file_name = node
         .path
@@ -189,8 +190,11 @@ fn render_directory_tree(
             }
         };
 
-        render_directory_tree(child, &new_prefix, is_last_child, style, lines);
+        let subtree_lines = render_directory_tree(child, &new_prefix, is_last_child, style);
+        lines.extend(subtree_lines);
     }
+
+    lines
 }
 
 fn flush() {
@@ -267,8 +271,7 @@ fn render_data(
     screen_size: (u16, u16),
     style: &Style,
 ) -> Result<String, std::io::Error> {
-    let mut lines = Vec::new();
-    render_directory_tree(directory_tree, "", true, style, &mut lines);
+    let lines = render_directory_tree(directory_tree, "", true, style);
 
     Ok(format!(
         "{}{}{}\r\n{}\r\n",
