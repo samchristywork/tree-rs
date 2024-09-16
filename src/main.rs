@@ -20,6 +20,10 @@ struct Args {
     #[clap(short, long, default_value = ".")]
     directory: String,
 
+    /// Use case-sensitive regex matching (default is case-insensitive)
+    #[clap(short, long)]
+    case_sensitive: bool,
+
     /// Style to use for rendering (compact or full)
     #[clap(short, long, default_value = "full")]
     style: String,
@@ -315,7 +319,7 @@ fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
     matched
 }
 
-fn main_loop(directory: &str, style: &Style) -> String {
+fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
     let mut pattern = String::new();
 
     let term = termion::get_tty().expect("Failed to get terminal");
@@ -325,7 +329,13 @@ fn main_loop(directory: &str, style: &Style) -> String {
     loop {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
-        let re = match Regex::new(&pattern) {
+        let p = if case_sensitive {
+            format!("(?-s:{pattern})")
+        } else {
+            format!("(?i:{pattern})")
+        };
+
+        let re = match Regex::new(&p) {
             Ok(re) => re,
             Err(e) => {
                 return format!(
@@ -432,7 +442,7 @@ fn main() {
 
     alternate_screen();
 
-    let result = main_loop(&args.directory, &style);
+    let result = main_loop(&args.directory, &style, args.case_sensitive);
 
     normal_screen();
 
