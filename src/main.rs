@@ -76,60 +76,63 @@ struct DirectoryNode {
     path: PathBuf,
     children: Vec<DirectoryNode>,
     matched: bool,
+    error: Option<io::Error>,
 }
 
-fn build_directory_tree_data(dir: &str) -> Result<DirectoryNode, std::io::Error> {
+fn build_directory_tree_data(dir: &str) -> DirectoryNode {
     let path = PathBuf::from(dir);
     let mut node = DirectoryNode {
         path: path.clone(),
         children: Vec::new(),
         matched: false,
+        error: None,
     };
 
     if !path.is_dir() {
-        return Err(io::Error::new(
+        node.error = Some(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("Error: {dir} is not a directory."),
+            format!("Error: '{dir}' is not a directory."),
         ));
+        return node;
     }
 
     let entries = match fs::read_dir(&path) {
         Ok(entries) => entries,
         Err(e) => {
-            if e.kind() == io::ErrorKind::PermissionDenied {
-                return Err(io::Error::new(
-                    io::ErrorKind::PermissionDenied,
-                    format!("Error: Permission denied for directory '{dir}'."),
-                ));
-            }
-            return Err(e);
+            node.error = Some(e);
+            return node;
         }
     };
 
-    let mut entries_vec: Vec<_> = entries.collect::<Result<_, _>>()?;
+    let mut entries_vec: Vec<_> = entries
+        .collect::<Result<_, _>>()
+        .expect("Failed to collect directory entries");
     entries_vec.sort_by_key(std::fs::DirEntry::file_name);
 
     for entry in entries_vec {
         let entry_path = entry.path();
-        let file_type = entry.file_type()?;
+        let file_type = entry
+            .file_type()
+            .expect("Failed to get file type for entry");
 
         if file_type.is_dir() {
             let child_node = build_directory_tree_data(
                 entry_path
                     .to_str()
                     .expect("Failed to convert path to string"),
-            )?;
+            );
             node.children.push(child_node);
         } else {
             node.children.push(DirectoryNode {
                 path: entry_path,
                 children: Vec::new(),
                 matched: false,
+                error: None,
             });
         }
     }
 
-    Ok(node)
+    node
 }
 
 fn render_directory_tree(
@@ -157,7 +160,7 @@ fn render_directory_tree(
         (Style::Full, false) => "├─",
     };
 
-    let color = if fs::symlink_metadata(&node.path)
+    let mut color = if fs::symlink_metadata(&node.path)
         .map(|m| m.file_type().is_symlink())
         .unwrap_or(false)
     {
@@ -168,9 +171,19 @@ fn render_directory_tree(
         magenta()
     };
 
+    if node.error.is_some() {
+        color = red();
+    }
+
+    let error = if let Some(ref e) = node.error {
+        format!(" {e}")
+    } else {
+        "".to_string()
+    };
+
     let line = Line {
         first_part: format!("{prefix}{connector}"),
-        last_part: format!("{file_name}"),
+        last_part: format!("{file_name}{error}"),
         color,
     };
     lines.push(line);
@@ -308,8 +321,7 @@ fn main_loop(directory: &str, style: &Style) -> String {
     let term = termion::get_tty().expect("Failed to get terminal");
     let _raw_term = term.into_raw_mode().expect("Failed to enter raw mode");
 
-    let mut directory_tree =
-        build_directory_tree_data(directory).expect("Failed to build directory tree");
+    let mut directory_tree = build_directory_tree_data(directory);
     loop {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
