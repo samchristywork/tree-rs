@@ -1,9 +1,11 @@
-use clap::{Parser, ValueEnum};
+use clap::Parser;
+use clap::ValueEnum;
 use regex::Regex;
 use std::fs;
 use std::io;
 use std::io::Read;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use termion::raw::IntoRawMode;
 
@@ -80,15 +82,28 @@ struct DirectoryNode {
     path: PathBuf,
     children: Vec<DirectoryNode>,
     matched: bool,
+    color: String,
     error: Option<io::Error>,
+}
+
+fn determine_color(path: &Path) -> String {
+    if path.is_symlink() {
+        yellow() // Symlinks
+    } else if path.is_dir() {
+        cyan() // Directories
+    } else {
+        magenta() // Regular files
+    }
 }
 
 fn build_directory_tree_data(dir: &str) -> DirectoryNode {
     let path = PathBuf::from(dir);
+
     let mut node = DirectoryNode {
         path: path.clone(),
         children: Vec::new(),
         matched: false,
+        color: determine_color(&path),
         error: None,
     };
 
@@ -104,6 +119,7 @@ fn build_directory_tree_data(dir: &str) -> DirectoryNode {
         Ok(entries) => entries,
         Err(e) => {
             node.error = Some(e);
+            node.color = red();
             return node;
         }
     };
@@ -128,6 +144,7 @@ fn build_directory_tree_data(dir: &str) -> DirectoryNode {
             node.children.push(child_node);
         } else {
             node.children.push(DirectoryNode {
+                color: determine_color(&entry_path),
                 path: entry_path,
                 children: Vec::new(),
                 matched: false,
@@ -163,19 +180,6 @@ fn render_directory_tree(
         (Style::Full, false) => "├─",
     };
 
-    let color = if node.error.is_some() {
-        red()
-    } else if fs::symlink_metadata(&node.path)
-        .map(|m| m.file_type().is_symlink())
-        .unwrap_or(false)
-    {
-        yellow()
-    } else if node.path.is_dir() {
-        cyan()
-    } else {
-        magenta()
-    };
-
     let error = node
         .error
         .as_ref()
@@ -184,7 +188,7 @@ fn render_directory_tree(
     let line = Line {
         first_part: format!("{prefix}{connector}"),
         last_part: format!("{file_name}{error}"),
-        color,
+        color: node.color.clone(),
     };
     lines.push(line);
 
@@ -282,10 +286,7 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
 fn render_data(directory_tree: &DirectoryNode, screen_size: (u16, u16), style: &Style) -> String {
     let lines = render_directory_tree(directory_tree, "", true, style);
 
-    format!(
-        "{}\r\n",
-        draw_tree(&lines, screen_size),
-    )
+    format!("{}\r\n", draw_tree(&lines, screen_size),)
 }
 
 fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
