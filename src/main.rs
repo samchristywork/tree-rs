@@ -151,11 +151,10 @@ fn render_directory_tree(
 
     let mut lines = Vec::new();
 
-    let file_name = node
-        .path
-        .file_name()
-        .expect("Failed to get file name")
-        .to_string_lossy();
+    let file_name = node.path.file_name().map_or_else(
+        || "<unknown>".to_string(),
+        |name| name.to_string_lossy().into_owned(),
+    );
 
     let connector = match (style, is_last) {
         (Style::Compact, true) => "└",
@@ -164,7 +163,9 @@ fn render_directory_tree(
         (Style::Full, false) => "├─",
     };
 
-    let mut color = if fs::symlink_metadata(&node.path)
+    let color = if node.error.is_some() {
+        red()
+    } else if fs::symlink_metadata(&node.path)
         .map(|m| m.file_type().is_symlink())
         .unwrap_or(false)
     {
@@ -175,15 +176,10 @@ fn render_directory_tree(
         magenta()
     };
 
-    if node.error.is_some() {
-        color = red();
-    }
-
-    let error = if let Some(ref e) = node.error {
-        format!(" {e}")
-    } else {
-        "".to_string()
-    };
+    let error = node
+        .error
+        .as_ref()
+        .map_or_else(String::new, |e| format!(" {e}",));
 
     let line = Line {
         first_part: format!("{prefix}{connector}"),
@@ -283,35 +279,20 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
     )
 }
 
-fn render_data(
-    directory_tree: &DirectoryNode,
-    screen_size: (u16, u16),
-    style: &Style,
-) -> Result<String, std::io::Error> {
+fn render_data(directory_tree: &DirectoryNode, screen_size: (u16, u16), style: &Style) -> String {
     let lines = render_directory_tree(directory_tree, "", true, style);
 
-    Ok(format!(
-        "{}{}{}\r\n{}\r\n",
-        cyan(),
-        fixed_length_string(
-            directory_tree.path.to_str().unwrap_or(""),
-            screen_size.0 as usize
-        ),
-        normal(),
+    format!(
+        "{}\r\n",
         draw_tree(&lines, screen_size),
-    ))
+    )
 }
 
 fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
-    let mut matched = re.is_match(
-        node.path
-            .file_name()
-            .expect("Failed to get file name")
-            .to_string_lossy()
-            .as_ref(),
-    );
+    let filename = node.path.file_name();
+    let mut matched = filename.is_some_and(|f| re.is_match(f.to_string_lossy().as_ref()));
 
-    for child in node.children.iter_mut() {
+    for child in &mut node.children {
         matched |= mark_matched_nodes(child, re);
     }
 
@@ -350,17 +331,7 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
         mark_matched_nodes(&mut directory_tree, &re);
 
         set_cursor_position(1, 1);
-        match render_data(&directory_tree, screen_size, style) {
-            Ok(output) => print!("{output}"),
-            Err(e) => {
-                print!(
-                    "{}Error: Failed to render directory: {}\r\n{}",
-                    red(),
-                    e,
-                    normal()
-                );
-            }
-        }
+        print!("{}", render_data(&directory_tree, screen_size, style));
         set_cursor_position(1, screen_size.1.saturating_sub(2));
         print!("{}", render_input(pattern.as_str(), screen_size));
         flush();
