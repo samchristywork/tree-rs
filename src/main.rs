@@ -31,25 +31,11 @@ struct Args {
     style: String,
 }
 
-fn cyan() -> String {
-    "\x1B[36m".to_string()
-}
-
-fn magenta() -> String {
-    "\x1B[35m".to_string()
-}
-
-fn yellow() -> String {
-    "\x1B[33m".to_string()
-}
-
-fn red() -> String {
-    "\x1B[31m".to_string()
-}
-
-fn normal() -> String {
-    "\x1B[0m".to_string()
-}
+const CYAN: &str = "\x1B[36m";
+const MAGENTA: &str = "\x1B[35m";
+const YELLOW: &str = "\x1B[33m";
+const RED: &str = "\x1B[31m";
+const NORMAL: &str = "\x1B[0m";
 
 fn flush() {
     std::io::stdout().flush().expect("Failed to flush stdout");
@@ -80,16 +66,16 @@ impl Line {
 
     fn to_limited_string(&self, n: usize) -> String {
         if self.length() <= n {
-            format!("{}{}{}", self.first_part, self.color, self.last_part) + &normal()
+            format!("{}{}{}", self.first_part, self.color, self.last_part) + NORMAL
         } else if self.first_part.len() < n {
             format!(
                 "{}{}{}",
                 self.first_part,
                 self.color,
                 &self.last_part[..n - self.first_part.len()]
-            ) + &normal()
+            ) + NORMAL
         } else {
-            format!("{}{}{}", &self.first_part[..n], self.color, &self.last_part) + &normal()
+            format!("{}{}{}", &self.first_part[..n], self.color, &self.last_part) + NORMAL
         }
     }
 }
@@ -104,12 +90,13 @@ struct DirectoryNode {
 
 fn determine_color(path: &Path) -> String {
     if path.is_symlink() {
-        yellow() // Symlinks
+        YELLOW // Symlinks
     } else if path.is_dir() {
-        cyan() // Directories
+        CYAN // Directories
     } else {
-        magenta() // Regular files
+        MAGENTA // Regular files
     }
+    .to_string()
 }
 
 fn build_directory_tree(dir: &str) -> DirectoryNode {
@@ -128,44 +115,41 @@ fn build_directory_tree(dir: &str) -> DirectoryNode {
         };
     }
 
-    let entries = match fs::read_dir(&path) {
-        Ok(entries) => entries,
+    let children = match fs::read_dir(&path) {
+        Ok(entries) => entries.filter_map(Result::ok),
         Err(e) => {
             return DirectoryNode {
                 path,
                 children: Vec::new(),
                 matched: false,
-                color: red(),
+                color: RED.to_string(),
                 error: Some(e),
             };
         }
     }
-    .filter_map(Result::ok);
-
-    let mut children = Vec::new();
-    for entry in entries {
-        let entry_path = entry.path();
-        let file_type = entry
+    .map(|entry| {
+        if entry
             .file_type()
-            .expect("Failed to get file type for entry");
-
-        if file_type.is_dir() {
-            let child_node = build_directory_tree(
-                entry_path
+            .expect("Failed to get file type for entry")
+            .is_dir()
+        {
+            build_directory_tree(
+                entry
+                    .path()
                     .to_str()
                     .expect("Failed to convert path to string"),
-            );
-            children.push(child_node);
+            )
         } else {
-            children.push(DirectoryNode {
-                color: determine_color(&entry_path),
-                path: entry_path,
+            DirectoryNode {
+                color: determine_color(&entry.path()),
+                path: entry.path(),
                 children: Vec::new(),
                 matched: false,
                 error: None,
-            });
+            }
         }
-    }
+    })
+    .collect();
 
     DirectoryNode {
         path: path.clone(),
@@ -210,23 +194,20 @@ fn render_directory_tree(
     }];
 
     for (i, child) in node.children.iter().enumerate() {
-        let is_last_child = i == node.children.len() - 1;
-        let new_prefix = if is_last {
-            match style {
-                Style::Compact => format!("{prefix} "),
-                Style::Full => format!("{prefix}  "),
-            }
-        } else {
-            match style {
-                Style::Compact => format!("{prefix}│"),
-                Style::Full => format!("{prefix}│ "),
-            }
-        };
-
         lines.extend(render_directory_tree(
             child,
-            &new_prefix,
-            is_last_child,
+            &if is_last {
+                match style {
+                    Style::Compact => format!("{prefix} "),
+                    Style::Full => format!("{prefix}  "),
+                }
+            } else {
+                match style {
+                    Style::Compact => format!("{prefix}│"),
+                    Style::Full => format!("{prefix}│ "),
+                }
+            },
+            i == node.children.len() - 1,
             style,
         ));
     }
@@ -247,21 +228,18 @@ fn draw_tree(tree: &[Line], screen_size: (u16, u16)) -> String {
     let max_height = screen_size.1 as usize - 5;
 
     let mut constrained_tree = String::new();
-
     for line in tree.iter().take(max_height) {
-        constrained_tree += line.to_limited_string(max_width).as_str();
-
         let remaining_space = max_width.saturating_sub(line.length());
+
+        constrained_tree += line.to_limited_string(max_width).as_str();
         if remaining_space > 0 {
             constrained_tree += &" ".repeat(remaining_space);
         }
-
         constrained_tree += "\r\n";
     }
 
     for _ in tree.len()..max_height {
-        constrained_tree += &" ".repeat(max_width);
-        constrained_tree += "\r\n";
+        constrained_tree += &" ".repeat(max_width) + "\r\n";
     }
 
     constrained_tree
@@ -316,12 +294,7 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
         let re = match Regex::new(&p) {
             Ok(re) => re,
             Err(e) => {
-                return format!(
-                    "{}Error: Failed to compile regex: {}\r\n{}",
-                    red(),
-                    e,
-                    normal()
-                );
+                return format!("{RED}Error: Failed to compile regex: {e}\r\n{NORMAL}");
             }
         };
 
