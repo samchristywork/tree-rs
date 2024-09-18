@@ -51,6 +51,22 @@ fn normal() -> String {
     "\x1B[0m".to_string()
 }
 
+fn flush() {
+    std::io::stdout().flush().expect("Failed to flush stdout");
+}
+
+fn alternate_screen() {
+    print!("\x1B[?1049h");
+}
+
+fn normal_screen() {
+    print!("\x1B[?1049l");
+}
+
+fn set_cursor_position(x: u16, y: u16) {
+    print!("\x1B[{y};{x}H");
+}
+
 struct Line {
     first_part: String,
     last_part: String,
@@ -96,54 +112,52 @@ fn determine_color(path: &Path) -> String {
     }
 }
 
-fn build_directory_tree_data(dir: &str) -> DirectoryNode {
+fn build_directory_tree(dir: &str) -> DirectoryNode {
     let path = PathBuf::from(dir);
 
-    let mut node = DirectoryNode {
-        path: path.clone(),
-        children: Vec::new(),
-        matched: false,
-        color: determine_color(&path),
-        error: None,
-    };
-
     if !path.is_dir() {
-        node.error = Some(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Error: '{dir}' is not a directory."),
-        ));
-        return node;
+        return DirectoryNode {
+            path: path.clone(),
+            children: Vec::new(),
+            matched: false,
+            color: determine_color(&path),
+            error: Some(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("Error: '{dir}' is not a directory."),
+            )),
+        };
     }
 
     let entries = match fs::read_dir(&path) {
         Ok(entries) => entries,
         Err(e) => {
-            node.error = Some(e);
-            node.color = red();
-            return node;
+            return DirectoryNode {
+                path,
+                children: Vec::new(),
+                matched: false,
+                color: red(),
+                error: Some(e),
+            };
         }
-    };
+    }
+    .filter_map(Result::ok);
 
-    let mut entries_vec: Vec<_> = entries
-        .collect::<Result<_, _>>()
-        .expect("Failed to collect directory entries");
-    entries_vec.sort_by_key(std::fs::DirEntry::file_name);
-
-    for entry in entries_vec {
+    let mut children = Vec::new();
+    for entry in entries {
         let entry_path = entry.path();
         let file_type = entry
             .file_type()
             .expect("Failed to get file type for entry");
 
         if file_type.is_dir() {
-            let child_node = build_directory_tree_data(
+            let child_node = build_directory_tree(
                 entry_path
                     .to_str()
                     .expect("Failed to convert path to string"),
             );
-            node.children.push(child_node);
+            children.push(child_node);
         } else {
-            node.children.push(DirectoryNode {
+            children.push(DirectoryNode {
                 color: determine_color(&entry_path),
                 path: entry_path,
                 children: Vec::new(),
@@ -153,7 +167,13 @@ fn build_directory_tree_data(dir: &str) -> DirectoryNode {
         }
     }
 
-    node
+    DirectoryNode {
+        path: path.clone(),
+        children,
+        matched: false,
+        color: determine_color(&path),
+        error: None,
+    }
 }
 
 fn render_directory_tree(
@@ -165,8 +185,6 @@ fn render_directory_tree(
     if !node.matched {
         return vec![];
     }
-
-    let mut lines = Vec::new();
 
     let file_name = node.path.file_name().map_or_else(
         || "<unknown>".to_string(),
@@ -183,18 +201,16 @@ fn render_directory_tree(
     let error = node
         .error
         .as_ref()
-        .map_or_else(String::new, |e| format!(" {e}",));
+        .map_or_else(String::new, |e| format!(" {e}"));
 
-    let line = Line {
+    let mut lines = vec![Line {
         first_part: format!("{prefix}{connector}"),
         last_part: format!("{file_name}{error}"),
         color: node.color.clone(),
-    };
-    lines.push(line);
+    }];
 
-    let num_children = node.children.len();
     for (i, child) in node.children.iter().enumerate() {
-        let is_last_child = i == num_children - 1;
+        let is_last_child = i == node.children.len() - 1;
         let new_prefix = if is_last {
             match style {
                 Style::Compact => format!("{prefix} "),
@@ -207,29 +223,15 @@ fn render_directory_tree(
             }
         };
 
-        let subtree_lines = render_directory_tree(child, &new_prefix, is_last_child, style);
-        lines.extend(subtree_lines);
+        lines.extend(render_directory_tree(
+            child,
+            &new_prefix,
+            is_last_child,
+            style,
+        ));
     }
 
     lines
-}
-
-fn flush() {
-    std::io::stdout().flush().expect("Failed to flush stdout");
-}
-
-fn alternate_screen() {
-    println!("\x1B[?1049h");
-    flush();
-}
-
-fn normal_screen() {
-    println!("\x1B[?1049l");
-    flush();
-}
-
-fn set_cursor_position(x: u16, y: u16) {
-    print!("\x1B[{y};{x}H");
 }
 
 fn fixed_length_string(s: &str, n: usize) -> String {
@@ -271,10 +273,9 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
         hex.push_str(&format!("0x{byte:02x} "));
     }
 
-    let hex = hex.as_str();
     format!(
         "{}\r\n{}\r\n{}",
-        fixed_length_string(hex, screen_size.0 as usize),
+        fixed_length_string(hex.as_str(), screen_size.0 as usize),
         fixed_length_string(
             format!("Pattern: '{pattern}'").as_str(),
             screen_size.0 as usize
@@ -283,15 +284,11 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
     )
 }
 
-fn render_data(directory_tree: &DirectoryNode, screen_size: (u16, u16), style: &Style) -> String {
-    let lines = render_directory_tree(directory_tree, "", true, style);
-
-    format!("{}\r\n", draw_tree(&lines, screen_size),)
-}
-
 fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
-    let filename = node.path.file_name();
-    let mut matched = filename.is_some_and(|f| re.is_match(f.to_string_lossy().as_ref()));
+    let mut matched = node
+        .path
+        .file_name()
+        .is_some_and(|f| re.is_match(f.to_string_lossy().as_ref()));
 
     for child in &mut node.children {
         matched |= mark_matched_nodes(child, re);
@@ -302,12 +299,11 @@ fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
 }
 
 fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
-    let mut pattern = String::new();
-
     let term = termion::get_tty().expect("Failed to get terminal");
     let _raw_term = term.into_raw_mode().expect("Failed to enter raw mode");
+    let mut directory_tree = build_directory_tree(directory);
 
-    let mut directory_tree = build_directory_tree_data(directory);
+    let mut pattern = String::new();
     loop {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
@@ -332,7 +328,13 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
         mark_matched_nodes(&mut directory_tree, &re);
 
         set_cursor_position(1, 1);
-        print!("{}", render_data(&directory_tree, screen_size, style));
+        print!(
+            "{}\r\n",
+            draw_tree(
+                &render_directory_tree(&directory_tree, "", true, style),
+                screen_size
+            )
+        );
         set_cursor_position(1, screen_size.1.saturating_sub(2));
         print!("{}", render_input(pattern.as_str(), screen_size));
         flush();
@@ -413,14 +415,10 @@ fn main() {
     };
 
     alternate_screen();
-
     let result = main_loop(&args.directory, &style, args.case_sensitive);
-
     normal_screen();
 
-    if result.is_empty() {
-        println!("No output generated.");
-    } else {
+    if !result.is_empty() {
         println!("{result}");
     }
 }
