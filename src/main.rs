@@ -223,26 +223,17 @@ fn fixed_length_string(s: &str, n: usize) -> String {
     }
 }
 
-fn draw_tree(tree: &[Line], screen_size: (u16, u16)) -> String {
-    let max_width = screen_size.0 as usize;
-    let max_height = screen_size.1 as usize - 5;
+fn draw_tree(tree: &[Line], max_width: usize, max_height: usize) -> String {
+    let blank_line = &(" ".repeat(max_width) + "\r");
 
-    let mut constrained_tree = String::new();
-    for line in tree.iter().take(max_height) {
-        let remaining_space = max_width.saturating_sub(line.length());
-
-        constrained_tree += line.to_limited_string(max_width).as_str();
-        if remaining_space > 0 {
-            constrained_tree += &" ".repeat(remaining_space);
-        }
-        constrained_tree += "\r\n";
-    }
-
-    for _ in tree.len()..max_height {
-        constrained_tree += &" ".repeat(max_width) + "\r\n";
-    }
-
-    constrained_tree
+    tree.iter()
+        .take(max_height)
+        .fold(String::new(), |acc, line| {
+            acc + blank_line + line.to_limited_string(max_width).as_str() + "\r\n"
+        })
+        + (tree.len()..max_height)
+            .fold(String::new(), |acc, _| acc + blank_line + "\r\n")
+            .as_str()
 }
 
 fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
@@ -263,17 +254,16 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
 }
 
 fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
-    let mut matched = node
+    node.matched = node
         .path
         .file_name()
-        .is_some_and(|f| re.is_match(f.to_string_lossy().as_ref()));
+        .is_some_and(|f| re.is_match(f.to_string_lossy().as_ref()))
+        | node
+            .children
+            .iter_mut()
+            .fold(false, |acc, child| acc | mark_matched_nodes(child, re));
 
-    for child in &mut node.children {
-        matched |= mark_matched_nodes(child, re);
-    }
-
-    node.matched = matched;
-    matched
+    node.matched
 }
 
 fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
@@ -305,7 +295,8 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
             "{}\r\n",
             draw_tree(
                 &render_directory_tree(&directory_tree, "", true, style),
-                screen_size
+                screen_size.0 as usize,
+                screen_size.1 as usize - 3
             )
         );
         set_cursor_position(1, screen_size.1.saturating_sub(2));
@@ -381,7 +372,6 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
 
 fn main() {
     let args = Args::parse();
-
     let style = match args.style.as_str() {
         "compact" => Style::Compact,
         _ => Style::Full,
