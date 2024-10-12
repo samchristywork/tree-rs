@@ -15,6 +15,22 @@ enum Style {
     Full,
 }
 
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+enum Event {
+    Key(char),
+    Direction(Direction),
+    Backspace,
+    Clear,
+    Enter,
+    Exit,
+}
+
 #[derive(Parser, Debug)]
 #[clap(author = "Sam Christy", version = "1.0", about = "An interactive program for exploring directory trees.", long_about = None)]
 struct Args {
@@ -274,7 +290,66 @@ fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
     node.matched
 }
 
-fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
+fn get_input() -> Event {
+    let mut buffer = [0; 1];
+    match io::stdin().read_exact(&mut buffer) {
+        Ok(()) => {
+            let char_value = buffer[0] as char;
+            match char_value as u8 {
+                0x7f | 0x08 => {
+                    // Backspace
+                    Event::Backspace
+                }
+                0x15 => {
+                    // Ctrl+U
+                    Event::Clear
+                }
+                0x04 => {
+                    // Ctrl+D
+                    Event::Exit
+                }
+                b'\r' => {
+                    // Enter
+                    Event::Enter
+                }
+                0x1b => {
+                    // Escape
+                    let mut buffer = [0; 1];
+                    match io::stdin().read_exact(&mut buffer) {
+                        Ok(()) => {
+                            let char_value = buffer[0] as char;
+                            match char_value as u8 {
+                                0x5b => {
+                                    // Arrow key
+                                    let mut buffer = [0; 1];
+                                    match io::stdin().read_exact(&mut buffer) {
+                                        Ok(()) => {
+                                            let char_value = buffer[0] as char;
+                                            match char_value as u8 {
+                                                0x41 => Event::Direction(Direction::Up),
+                                                0x42 => Event::Direction(Direction::Down),
+                                                0x43 => Event::Direction(Direction::Right),
+                                                0x44 => Event::Direction(Direction::Left),
+                                                _ => Event::Key(char_value),
+                                            }
+                                        }
+                                        Err(_) => Event::Key(char_value),
+                                    }
+                                }
+                                _ => Event::Key(char_value),
+                            }
+                        }
+                        Err(_) => Event::Key(char_value),
+                    }
+                }
+                _ => Event::Key(char_value),
+            }
+        }
+        Err(_) => Event::Exit,
+    }
+}
+
+fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<String> {
     let term = termion::get_tty().expect("Failed to get terminal");
     let _raw_term = term.into_raw_mode().expect("Failed to enter raw mode");
     let mut directory_tree = build_directory_tree(directory);
@@ -292,7 +367,8 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
         let re = match Regex::new(&p) {
             Ok(re) => re,
             Err(e) => {
-                return format!("{RED}Error: Failed to compile regex: {e}\r\n{NORMAL}");
+                eprintln!("{RED}Error: Failed to compile regex: {e}\r\n{NORMAL}");
+                return None;
             }
         };
 
@@ -311,71 +387,27 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> String {
         print!("{}", render_input(pattern.as_str(), screen_size));
         flush();
 
-        let mut buffer = [0; 1];
-        match io::stdin().read_exact(&mut buffer) {
-            Ok(()) => {
-                let char_value = buffer[0] as char;
-                match char_value as u8 {
-                    0x7f | 0x08 => {
-                        // Backspace
-                        if !pattern.is_empty() {
-                            pattern.pop();
-                        }
-                    }
-                    0x15 => {
-                        // Ctrl+U
-                        pattern.clear();
-                    }
-                    0x04 => {
-                        // Ctrl+D
-                        pattern.clear();
-                        break;
-                    }
-                    b'\r' => {
-                        // Enter
-                        break;
-                    }
-                    _ => {
-                        pattern.push(char_value);
-                    }
-                }
+        match get_input() {
+            Event::Key(c) => {
+                pattern.push(c);
             }
-            Err(e) => {
-                eprintln!("Error reading input: {e}");
+            Event::Direction(_) => {}
+            Event::Backspace => {
+                pattern.pop();
+            }
+            Event::Clear => {
+                pattern.clear();
+            }
+            Event::Enter => {
+                return Some(pattern);
+            }
+            Event::Exit => {
                 break;
-            }
-        }
-
-        if pattern.len() >= 4 {
-            match pattern
-                .as_bytes()
-                .iter()
-                .rev()
-                .take(4)
-                .rev()
-                .copied()
-                .collect::<Vec<u8>>()[..]
-            {
-                [0x1b, 0x5b, 0x35, 0x7e] => {
-                    // Page Up
-                    pattern.pop();
-                    pattern.pop();
-                    pattern.pop();
-                    pattern.pop();
-                }
-                [0x1b, 0x5b, 0x36, 0x7e] => {
-                    // Page Down
-                    pattern.pop();
-                    pattern.pop();
-                    pattern.pop();
-                    pattern.pop();
-                }
-                _ => {}
             }
         }
     }
 
-    pattern
+    None
 }
 
 fn main() {
@@ -389,7 +421,7 @@ fn main() {
     let result = main_loop(&args.directory, &style, args.case_sensitive);
     normal_screen();
 
-    if !result.is_empty() {
-        println!("{result}");
+    if let Some(pattern) = result {
+        print!("{pattern}");
     }
 }
