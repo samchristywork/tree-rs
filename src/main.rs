@@ -39,6 +39,22 @@ enum Event {
     Exit,
 }
 
+const BACKSPACE: u8 = 0x08;
+const DEL: u8 = 0x7f;
+const CTRL_U: u8 = 0x15;
+const CTRL_D: u8 = 0x04;
+const ENTER: u8 = b'\r';
+const ESCAPE: u8 = 0x1b;
+
+const CYAN: &str = "\x1B[36m";
+const MAGENTA: &str = "\x1B[35m";
+const YELLOW: &str = "\x1B[33m";
+const RED: &str = "\x1B[31m";
+const NORMAL: &str = "\x1B[0m";
+
+const ALTERNATE_SCREEN: &str = "\x1B[?1049h";
+const NORMAL_SCREEN: &str = "\x1B[?1049l";
+
 #[derive(Parser, Debug)]
 #[clap(author = "Sam Christy", version = "1.0", about = "An interactive program for exploring directory trees.", long_about = None)]
 struct Args {
@@ -55,22 +71,8 @@ struct Args {
     style: String,
 }
 
-const CYAN: &str = "\x1B[36m";
-const MAGENTA: &str = "\x1B[35m";
-const YELLOW: &str = "\x1B[33m";
-const RED: &str = "\x1B[31m";
-const NORMAL: &str = "\x1B[0m";
-
 fn flush() {
     std::io::stdout().flush().expect("Failed to flush stdout");
-}
-
-fn alternate_screen() {
-    print!("\x1B[?1049h");
-}
-
-fn normal_screen() {
-    print!("\x1B[?1049l");
 }
 
 fn set_cursor_position(x: u16, y: u16) {
@@ -298,117 +300,64 @@ fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
     node.matched
 }
 
+fn consume_7e(char_value: char, event: Navigation) -> Event {
+    let mut buffer = [0; 1];
+    match io::stdin().read_exact(&mut buffer) {
+        Ok(()) => {
+            let char_value = buffer[0] as char;
+            match char_value as u8 {
+                0x7e => Event::Navigation(event),
+                _ => Event::Key(char_value),
+            }
+        }
+        _ => Event::Key(char_value),
+    }
+}
+
+fn handle_control_keys(char_value: char) -> Event {
+    let mut buffer = [0; 1];
+    match io::stdin().read_exact(&mut buffer) {
+        Ok(()) => {
+            let char_value = buffer[0] as char;
+            match char_value as u8 {
+                0x5b => {}
+                _ => return Event::Key(char_value),
+            }
+        }
+        Err(_) => return Event::Key(char_value),
+    };
+
+    let mut buffer = [0; 1];
+    match io::stdin().read_exact(&mut buffer) {
+        Ok(()) => {
+            let char_value = buffer[0] as char;
+            match char_value as u8 {
+                0x41 => Event::Direction(Direction::Up),
+                0x42 => Event::Direction(Direction::Down),
+                0x43 => Event::Direction(Direction::Right),
+                0x44 => Event::Direction(Direction::Left),
+                0x35 => consume_7e(char_value, Navigation::PageUp),
+                0x36 => consume_7e(char_value, Navigation::PageDown),
+                0x31 => consume_7e(char_value, Navigation::Home),
+                0x34 => consume_7e(char_value, Navigation::End),
+                _ => Event::Key(char_value),
+            }
+        }
+        Err(_) => Event::Key(char_value),
+    }
+}
+
 fn get_input() -> Event {
     let mut buffer = [0; 1];
     match io::stdin().read_exact(&mut buffer) {
         Ok(()) => {
             let char_value = buffer[0] as char;
             match char_value as u8 {
-                0x7f | 0x08 => {
-                    // Backspace
-                    Event::Backspace
-                }
-                0x15 => {
-                    // Ctrl+U
-                    Event::Clear
-                }
-                0x04 => {
-                    // Ctrl+D
-                    Event::Exit
-                }
-                b'\r' => {
-                    // Enter
-                    Event::Enter
-                }
-                0x1b => {
-                    // Escape
-                    let mut buffer = [0; 1];
-                    match io::stdin().read_exact(&mut buffer) {
-                        Ok(()) => {
-                            let char_value = buffer[0] as char;
-                            match char_value as u8 {
-                                0x5b => {
-                                    let mut buffer = [0; 1];
-                                    match io::stdin().read_exact(&mut buffer) {
-                                        Ok(()) => {
-                                            let char_value = buffer[0] as char;
-                                            match char_value as u8 {
-                                                0x41 => Event::Direction(Direction::Up),
-                                                0x42 => Event::Direction(Direction::Down),
-                                                0x43 => Event::Direction(Direction::Right),
-                                                0x44 => Event::Direction(Direction::Left),
-                                                0x35 => {
-                                                    let mut buffer = [0; 1];
-                                                    match io::stdin().read_exact(&mut buffer) {
-                                                        Ok(()) => {
-                                                            let char_value = buffer[0] as char;
-                                                            match char_value as u8 {
-                                                                0x7e => Event::Navigation(
-                                                                    Navigation::PageUp,
-                                                                ),
-                                                                _ => Event::Key(char_value),
-                                                            }
-                                                        }
-                                                        _ => Event::Key(char_value),
-                                                    }
-                                                }
-                                                0x36 => {
-                                                    let mut buffer = [0; 1];
-                                                    match io::stdin().read_exact(&mut buffer) {
-                                                        Ok(()) => {
-                                                            let char_value = buffer[0] as char;
-                                                            match char_value as u8 {
-                                                                0x7e => Event::Navigation(
-                                                                    Navigation::PageDown,
-                                                                ),
-                                                                _ => Event::Key(char_value),
-                                                            }
-                                                        }
-                                                        _ => Event::Key(char_value),
-                                                    }
-                                                }
-                                                0x31 => {
-                                                    let mut buffer = [0; 1];
-                                                    match io::stdin().read_exact(&mut buffer) {
-                                                        Ok(()) => {
-                                                            let char_value = buffer[0] as char;
-                                                            match char_value as u8 {
-                                                                0x7e => Event::Navigation(
-                                                                    Navigation::Home,
-                                                                ),
-                                                                _ => Event::Key(char_value),
-                                                            }
-                                                        }
-                                                        _ => Event::Key(char_value),
-                                                    }
-                                                }
-                                                0x34 => {
-                                                    let mut buffer = [0; 1];
-                                                    match io::stdin().read_exact(&mut buffer) {
-                                                        Ok(()) => {
-                                                            let char_value = buffer[0] as char;
-                                                            match char_value as u8 {
-                                                                0x7e => Event::Navigation(
-                                                                    Navigation::End,
-                                                                ),
-                                                                _ => Event::Key(char_value),
-                                                            }
-                                                        }
-                                                        _ => Event::Key(char_value),
-                                                    }
-                                                }
-                                                _ => Event::Key(char_value),
-                                            }
-                                        }
-                                        Err(_) => Event::Key(char_value),
-                                    }
-                                }
-                                _ => Event::Key(char_value),
-                            }
-                        }
-                        Err(_) => Event::Key(char_value),
-                    }
-                }
+                BACKSPACE | DEL => Event::Backspace,
+                CTRL_U => Event::Clear,
+                CTRL_D => Event::Exit,
+                ENTER => Event::Enter,
+                ESCAPE => handle_control_keys(char_value),
                 _ => Event::Key(char_value),
             }
         }
@@ -458,8 +407,22 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
             Event::Key(c) => {
                 pattern.push(c);
             }
-            Event::Direction(_) => {}
-            Event::Navigation(_) => {}
+            Event::Direction(d) => {
+                match d {
+                    Direction::Up => {},
+                    Direction::Down => {},
+                    Direction::Left => {},
+                    Direction::Right => {},
+                };
+            }
+            Event::Navigation(n) => {
+                match n {
+                    Navigation::PageUp => {},
+                    Navigation::PageDown => {},
+                    Navigation::Home => {},
+                    Navigation::End => {},
+                };
+            }
             Event::Backspace => {
                 pattern.pop();
             }
@@ -485,9 +448,9 @@ fn main() {
         _ => Style::Full,
     };
 
-    alternate_screen();
+    print!("{ALTERNATE_SCREEN}");
     let result = main_loop(&args.directory, &style, args.case_sensitive);
-    normal_screen();
+    print!("{NORMAL_SCREEN}");
 
     if let Some(pattern) = result {
         print!("{pattern}");
