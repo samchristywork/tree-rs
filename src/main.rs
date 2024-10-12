@@ -22,9 +22,17 @@ enum Direction {
     Right,
 }
 
+enum Navigation {
+    PageUp,
+    PageDown,
+    Home,
+    End,
+}
+
 enum Event {
     Key(char),
     Direction(Direction),
+    Navigation(Navigation),
     Backspace,
     Clear,
     Enter,
@@ -320,7 +328,6 @@ fn get_input() -> Event {
                             let char_value = buffer[0] as char;
                             match char_value as u8 {
                                 0x5b => {
-                                    // Arrow key
                                     let mut buffer = [0; 1];
                                     match io::stdin().read_exact(&mut buffer) {
                                         Ok(()) => {
@@ -330,6 +337,66 @@ fn get_input() -> Event {
                                                 0x42 => Event::Direction(Direction::Down),
                                                 0x43 => Event::Direction(Direction::Right),
                                                 0x44 => Event::Direction(Direction::Left),
+                                                0x35 => {
+                                                    let mut buffer = [0; 1];
+                                                    match io::stdin().read_exact(&mut buffer) {
+                                                        Ok(()) => {
+                                                            let char_value = buffer[0] as char;
+                                                            match char_value as u8 {
+                                                                0x7e => Event::Navigation(
+                                                                    Navigation::PageUp,
+                                                                ),
+                                                                _ => Event::Key(char_value),
+                                                            }
+                                                        }
+                                                        _ => Event::Key(char_value),
+                                                    }
+                                                }
+                                                0x36 => {
+                                                    let mut buffer = [0; 1];
+                                                    match io::stdin().read_exact(&mut buffer) {
+                                                        Ok(()) => {
+                                                            let char_value = buffer[0] as char;
+                                                            match char_value as u8 {
+                                                                0x7e => Event::Navigation(
+                                                                    Navigation::PageDown,
+                                                                ),
+                                                                _ => Event::Key(char_value),
+                                                            }
+                                                        }
+                                                        _ => Event::Key(char_value),
+                                                    }
+                                                }
+                                                0x31 => {
+                                                    let mut buffer = [0; 1];
+                                                    match io::stdin().read_exact(&mut buffer) {
+                                                        Ok(()) => {
+                                                            let char_value = buffer[0] as char;
+                                                            match char_value as u8 {
+                                                                0x7e => Event::Navigation(
+                                                                    Navigation::Home,
+                                                                ),
+                                                                _ => Event::Key(char_value),
+                                                            }
+                                                        }
+                                                        _ => Event::Key(char_value),
+                                                    }
+                                                }
+                                                0x34 => {
+                                                    let mut buffer = [0; 1];
+                                                    match io::stdin().read_exact(&mut buffer) {
+                                                        Ok(()) => {
+                                                            let char_value = buffer[0] as char;
+                                                            match char_value as u8 {
+                                                                0x7e => Event::Navigation(
+                                                                    Navigation::End,
+                                                                ),
+                                                                _ => Event::Key(char_value),
+                                                            }
+                                                        }
+                                                        _ => Event::Key(char_value),
+                                                    }
+                                                }
                                                 _ => Event::Key(char_value),
                                             }
                                         }
@@ -392,6 +459,7 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
                 pattern.push(c);
             }
             Event::Direction(_) => {}
+            Event::Navigation(_) => {}
             Event::Backspace => {
                 pattern.pop();
             }
