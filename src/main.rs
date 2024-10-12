@@ -193,6 +193,14 @@ fn render_directory_tree(
         color: node.color.clone(),
     }];
 
+    let index_of_last_match = node
+        .children
+        .iter()
+        .enumerate()
+        .filter_map(|(i, child)| child.matched.then_some(i))
+        .last()
+        .unwrap_or(0);
+
     for (i, child) in node.children.iter().enumerate() {
         lines.extend(render_directory_tree(
             child,
@@ -207,7 +215,7 @@ fn render_directory_tree(
                     Style::Full => format!("{prefix}│ "),
                 }
             },
-            i == node.children.len() - 1,
+            i == index_of_last_match,
             style,
         ));
     }
