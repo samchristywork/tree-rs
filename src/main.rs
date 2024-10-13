@@ -3,11 +3,14 @@ use clap::ValueEnum;
 use regex::Regex;
 use std::fs;
 use std::io;
-use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use termion::raw::IntoRawMode;
+
+mod input;
+
+use input::get_input;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Style {
@@ -15,21 +18,21 @@ enum Style {
     Full,
 }
 
-enum Direction {
+pub enum Direction {
     Up,
     Down,
     Left,
     Right,
 }
 
-enum Navigation {
+pub enum Navigation {
     PageUp,
     PageDown,
     Home,
     End,
 }
 
-enum Event {
+pub enum Event {
     Key(char),
     Direction(Direction),
     Navigation(Navigation),
@@ -38,13 +41,6 @@ enum Event {
     Enter,
     Exit,
 }
-
-const BACKSPACE: u8 = 0x08;
-const DEL: u8 = 0x7f;
-const CTRL_U: u8 = 0x15;
-const CTRL_D: u8 = 0x04;
-const ENTER: u8 = b'\r';
-const ESCAPE: u8 = 0x1b;
 
 const CYAN: &str = "\x1B[36m";
 const MAGENTA: &str = "\x1B[35m";
@@ -312,71 +308,6 @@ fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
             .fold(false, |acc, child| acc | mark_matched_nodes(child, re));
 
     node.matched
-}
-
-fn consume_7e(char_value: char, event: Navigation) -> Event {
-    let mut buffer = [0; 1];
-    match io::stdin().read_exact(&mut buffer) {
-        Ok(()) => {
-            let char_value = buffer[0] as char;
-            match char_value as u8 {
-                0x7e => Event::Navigation(event),
-                _ => Event::Key(char_value),
-            }
-        }
-        _ => Event::Key(char_value),
-    }
-}
-
-fn handle_control_keys(char_value: char) -> Event {
-    let mut buffer = [0; 1];
-    match io::stdin().read_exact(&mut buffer) {
-        Ok(()) => {
-            let char_value = buffer[0] as char;
-            match char_value as u8 {
-                0x5b => {}
-                _ => return Event::Key(char_value),
-            }
-        }
-        Err(_) => return Event::Key(char_value),
-    };
-
-    let mut buffer = [0; 1];
-    match io::stdin().read_exact(&mut buffer) {
-        Ok(()) => {
-            let char_value = buffer[0] as char;
-            match char_value as u8 {
-                0x41 => Event::Direction(Direction::Up),
-                0x42 => Event::Direction(Direction::Down),
-                0x43 => Event::Direction(Direction::Right),
-                0x44 => Event::Direction(Direction::Left),
-                0x35 => consume_7e(char_value, Navigation::PageUp),
-                0x36 => consume_7e(char_value, Navigation::PageDown),
-                0x31 => consume_7e(char_value, Navigation::Home),
-                0x34 => consume_7e(char_value, Navigation::End),
-                _ => Event::Key(char_value),
-            }
-        }
-        Err(_) => Event::Key(char_value),
-    }
-}
-
-fn get_input() -> Event {
-    let mut buffer = [0; 1];
-    match io::stdin().read_exact(&mut buffer) {
-        Ok(()) => {
-            let char_value = buffer[0] as char;
-            match char_value as u8 {
-                BACKSPACE | DEL => Event::Backspace,
-                CTRL_U => Event::Clear,
-                CTRL_D => Event::Exit,
-                ENTER => Event::Enter,
-                ESCAPE => handle_control_keys(char_value),
-                _ => Event::Key(char_value),
-            }
-        }
-        Err(_) => Event::Exit,
-    }
 }
 
 fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<String> {
