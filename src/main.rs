@@ -257,15 +257,16 @@ fn fixed_length_string(s: &str, n: usize) -> String {
     }
 }
 
-fn draw_tree(tree: &[Line], max_width: usize, max_height: usize) -> String {
+fn draw_tree(tree: &[Line], max_width: usize, max_height: usize, scroll: usize) -> String {
     let blank_line = &(" ".repeat(max_width) + "\r");
 
     tree.iter()
+        .skip(scroll)
         .take(max_height)
         .fold(String::new(), |acc, line| {
             acc + blank_line + line.to_limited_string(max_width).as_str() + "\r\n"
         })
-        + (tree.len()..max_height)
+        + ((tree.len() - scroll)..max_height)
             .fold(String::new(), |acc, _| acc + blank_line + "\r\n")
             .as_str()
 }
@@ -371,6 +372,7 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
     let mut directory_tree = build_directory_tree(directory);
 
     let mut pattern = String::new();
+    let mut scroll = 0;
     loop {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
@@ -391,12 +393,19 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
         mark_matched_nodes(&mut directory_tree, &re);
 
         set_cursor_position(1, 1);
+        let lines = render_directory_tree(&directory_tree, "", true, style);
+
+        if scroll >= lines.len() {
+            scroll = lines.len().saturating_sub(1);
+        }
+
         print!(
             "{}\r\n",
             draw_tree(
-                &render_directory_tree(&directory_tree, "", true, style),
+                &lines,
                 screen_size.0 as usize,
-                screen_size.1 as usize - 3
+                screen_size.1 as usize - 3,
+                scroll
             )
         );
         set_cursor_position(1, screen_size.1.saturating_sub(2));
@@ -409,18 +418,22 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
             }
             Event::Direction(d) => {
                 match d {
-                    Direction::Up => {},
-                    Direction::Down => {},
-                    Direction::Left => {},
-                    Direction::Right => {},
+                    Direction::Up => {}
+                    Direction::Down => {}
+                    Direction::Left => {}
+                    Direction::Right => {}
                 };
             }
             Event::Navigation(n) => {
                 match n {
-                    Navigation::PageUp => {},
-                    Navigation::PageDown => {},
-                    Navigation::Home => {},
-                    Navigation::End => {},
+                    Navigation::PageUp => {
+                        scroll += 1;
+                    }
+                    Navigation::PageDown => {
+                        scroll = scroll.saturating_sub(1);
+                    }
+                    Navigation::Home => {}
+                    Navigation::End => {}
                 };
             }
             Event::Backspace => {
