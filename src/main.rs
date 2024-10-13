@@ -73,12 +73,10 @@ struct Args {
     style: String,
 }
 
-fn flush() {
-    std::io::stdout().flush().expect("Failed to flush stdout");
-}
-
-fn set_cursor_position(x: u16, y: u16) {
-    print!("\x1B[{y};{x}H");
+macro_rules! set_cursor_position {
+    ($x:expr, $y:expr) => {
+        print!("\x1B[{};{}H", $y, $x);
+    };
 }
 
 struct Line {
@@ -407,7 +405,7 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
 
         mark_matched_nodes(&mut directory_tree, &re);
 
-        set_cursor_position(1, 1);
+        set_cursor_position!(1, 1);
         let lines = render_directory_tree(&directory_tree, "", true, style);
 
         if scroll >= lines.len() {
@@ -423,9 +421,9 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
                 scroll
             )
         );
-        set_cursor_position(1, screen_size.1.saturating_sub(2));
+        set_cursor_position!(1, screen_size.1.saturating_sub(2));
         print!("{}", render_input(pattern.as_str(), screen_size));
-        flush();
+        std::io::stdout().flush().expect("Failed to flush stdout");
 
         match get_input() {
             Event::Key(c) => {
