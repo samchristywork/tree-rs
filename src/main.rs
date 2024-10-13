@@ -51,6 +51,8 @@ const MAGENTA: &str = "\x1B[35m";
 const YELLOW: &str = "\x1B[33m";
 const RED: &str = "\x1B[31m";
 const NORMAL: &str = "\x1B[0m";
+const INVERT: &str = "\x1B[7m";
+const UNINVERT: &str = "\x1B[27m";
 
 const ALTERNATE_SCREEN: &str = "\x1B[?1049h";
 const NORMAL_SCREEN: &str = "\x1B[?1049l";
@@ -86,22 +88,35 @@ struct Line {
 }
 
 impl Line {
+    fn highlight(&self, s: &str) -> String {
+        let mut highlighted = String::new();
+        for c in s.chars() {
+            if c=='a' {
+                highlighted.push_str(&format!("{INVERT}{c}{UNINVERT}"));
+            } else {
+                highlighted.push(c);
+            }
+        }
+
+        highlighted
+    }
+
     fn length(&self) -> usize {
         self.first_part.len() + self.last_part.len()
     }
 
-    fn to_limited_string(&self, n: usize) -> String {
+    fn to_string(&self, n: usize) -> String {
         if self.length() <= n {
-            format!("{}{}{}", self.first_part, self.color, self.last_part) + NORMAL
+            format!("{}{}{}{NORMAL}", self.first_part, self.color, self.highlight(&self.last_part))
         } else if self.first_part.len() < n {
             format!(
-                "{}{}{}",
+                "{}{}{}{NORMAL}",
                 self.first_part,
                 self.color,
-                &self.last_part[..n - self.first_part.len()]
-            ) + NORMAL
+                self.highlight(&self.last_part[..n - self.first_part.len()])
+            )
         } else {
-            format!("{}{}{}", &self.first_part[..n], self.color, &self.last_part) + NORMAL
+            format!("{}{}{}{NORMAL}", &self.first_part[..n], self.color, self.highlight(&self.last_part))
         }
     }
 }
@@ -264,7 +279,7 @@ fn draw_tree(tree: &[Line], max_width: usize, max_height: usize, scroll: usize) 
         .skip(scroll)
         .take(max_height)
         .fold(String::new(), |acc, line| {
-            acc + blank_line + line.to_limited_string(max_width).as_str() + "\r\n"
+            acc + blank_line + line.to_string(max_width).as_str() + "\r\n"
         })
         + ((tree.len() - scroll)..max_height)
             .fold(String::new(), |acc, _| acc + blank_line + "\r\n")
