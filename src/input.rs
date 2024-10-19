@@ -1,9 +1,9 @@
 use std::io;
 use std::io::Read;
 
+use crate::Direction;
 use crate::Event;
 use crate::Navigation;
-use crate::Direction;
 
 const BACKSPACE: u8 = 0x08;
 const DEL: u8 = 0x7f;

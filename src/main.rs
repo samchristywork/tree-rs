@@ -80,7 +80,7 @@ impl Line {
     fn highlight(&self, s: &str) -> String {
         let mut highlighted = String::new();
         for c in s.chars() {
-            if c=='a' {
+            if c == 'a' {
                 highlighted.push_str(&format!("{INVERT}{c}{UNINVERT}"));
             } else {
                 highlighted.push(c);
@@ -96,7 +96,12 @@ impl Line {
 
     fn to_string(&self, n: usize) -> String {
         if self.length() <= n {
-            format!("{}{}{}{NORMAL}", self.first_part, self.color, self.highlight(&self.last_part))
+            format!(
+                "{}{}{}{NORMAL}",
+                self.first_part,
+                self.color,
+                self.highlight(&self.last_part)
+            )
         } else if self.first_part.len() < n {
             format!(
                 "{}{}{}{NORMAL}",
@@ -105,7 +110,12 @@ impl Line {
                 self.highlight(&self.last_part[..n - self.first_part.len()])
             )
         } else {
-            format!("{}{}{}{NORMAL}", &self.first_part[..n], self.color, self.highlight(&self.last_part))
+            format!(
+                "{}{}{}{NORMAL}",
+                &self.first_part[..n],
+                self.color,
+                self.highlight(&self.last_part)
+            )
         }
     }
 }
@@ -203,7 +213,78 @@ fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
     node.matched
 }
 
-fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Result<Option<String>, String> {
+fn handle_input(
+    pattern: &mut String,
+    cursor_pos: &mut usize,
+    scroll: &mut usize,
+) -> Option<String> {
+    match get_input() {
+        Event::Key(c) => {
+            if *cursor_pos < pattern.len() {
+                pattern.insert(*cursor_pos, c);
+            } else {
+                pattern.push(c);
+            }
+            *cursor_pos += 1;
+        }
+        Event::Direction(d) => {
+            match d {
+                Direction::Up => {}
+                Direction::Down => {}
+                Direction::Left => {
+                    *cursor_pos = cursor_pos.saturating_sub(1);
+                }
+                Direction::Right => {
+                    *cursor_pos += 1;
+                    if *cursor_pos > pattern.len() {
+                        *cursor_pos = pattern.len();
+                    }
+                }
+            };
+        }
+        Event::Navigation(n) => {
+            match n {
+                Navigation::PageUp => {
+                    *scroll += 1;
+                }
+                Navigation::PageDown => {
+                    *scroll = scroll.saturating_sub(1);
+                }
+                Navigation::Home => {
+                    *cursor_pos = 0;
+                }
+                Navigation::End => {
+                    *cursor_pos = pattern.len();
+                }
+            };
+        }
+        Event::Backspace => {
+            let one_before = cursor_pos.saturating_sub(1);
+            if one_before < pattern.len() {
+                pattern.remove(one_before);
+            }
+            *cursor_pos = cursor_pos.saturating_sub(1);
+        }
+        Event::Clear => {
+            pattern.clear();
+            *cursor_pos = 0;
+        }
+        Event::Enter => {
+            return Some(format!("{}", pattern));
+        }
+        Event::Exit => {
+            return Some(String::new());
+        }
+    }
+
+    None
+}
+
+fn main_loop(
+    directory: &str,
+    style: &Style,
+    case_sensitive: bool,
+) -> Result<Option<String>, String> {
     let term = termion::get_tty().expect("Failed to get terminal");
     let _raw_term = term.into_raw_mode().expect("Failed to enter raw mode");
     let mut directory_tree = build_directory_tree(directory);
@@ -222,11 +303,7 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Result<Opt
 
         let re = match Regex::new(&p) {
             Ok(re) => re,
-            Err(e) => {
-                return Err(format!(
-                    "Error: Invalid regex pattern '{pattern}': {e}"
-                ))
-            }
+            Err(e) => return Err(format!("Error: Invalid regex pattern '{pattern}': {e}")),
         };
 
         mark_matched_nodes(&mut directory_tree, &re);
@@ -240,67 +317,16 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Result<Opt
             cursor_pos,
         );
 
-        match get_input() {
-            Event::Key(c) => {
-                if cursor_pos < pattern.len() {
-                    pattern.insert(cursor_pos, c);
-                } else {
-                    pattern.push(c);
-                }
-                cursor_pos += 1;
+        match handle_input(&mut pattern, &mut cursor_pos, &mut scroll) {
+            Some(p) if p.is_empty() => {
+                return Ok(None);
             }
-            Event::Direction(d) => {
-                match d {
-                    Direction::Up => {}
-                    Direction::Down => {}
-                    Direction::Left => {
-                        cursor_pos = cursor_pos.saturating_sub(1);
-                    }
-                    Direction::Right => {
-                        cursor_pos += 1;
-                        if cursor_pos > pattern.len() {
-                            cursor_pos = pattern.len();
-                        }
-                    }
-                };
+            Some(p) => {
+                return Ok(Some(p));
             }
-            Event::Navigation(n) => {
-                match n {
-                    Navigation::PageUp => {
-                        scroll += 1;
-                    }
-                    Navigation::PageDown => {
-                        scroll = scroll.saturating_sub(1);
-                    }
-                    Navigation::Home => {
-                        cursor_pos = 0;
-                    }
-                    Navigation::End => {
-                        cursor_pos = pattern.len();
-                    }
-                };
-            }
-            Event::Backspace => {
-                let one_before = cursor_pos.saturating_sub(1);
-                if one_before < pattern.len() {
-                    pattern.remove(one_before);
-                }
-                cursor_pos = cursor_pos.saturating_sub(1);
-            }
-            Event::Clear => {
-                pattern.clear();
-                cursor_pos = 0;
-            }
-            Event::Enter => {
-                return Ok(Some(pattern));
-            }
-            Event::Exit => {
-                break;
-            }
-        }
+            None => {}
+        };
     }
-
-    Ok(None)
 }
 
 fn main() {
@@ -324,6 +350,6 @@ fn main() {
     };
 
     if let Some(pattern) = result {
-        print!("{pattern}");
+        println!("{pattern}");
     }
 }

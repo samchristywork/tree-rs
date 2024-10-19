@@ -1,8 +1,8 @@
 use std::io::Write;
 
-use crate::Style;
-use crate::Line;
 use crate::DirectoryNode;
+use crate::Line;
+use crate::Style;
 
 macro_rules! set_cursor_position {
     ($x:expr, $y:expr) => {
@@ -112,27 +112,34 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
     )
 }
 
-pub fn draw(directory_tree: &DirectoryNode, pattern: &str, style: &Style, scroll: &mut usize, screen_size: (u16, u16), cursor_pos: usize) {
-        set_cursor_position!(1, 1);
-        let lines = render_directory_tree(directory_tree, "", true, style);
+pub fn draw(
+    directory_tree: &DirectoryNode,
+    pattern: &str,
+    style: &Style,
+    scroll: &mut usize,
+    screen_size: (u16, u16),
+    cursor_pos: usize,
+) {
+    set_cursor_position!(1, 1);
+    let lines = render_directory_tree(directory_tree, "", true, style);
 
-        if *scroll >= lines.len() {
-            *scroll = lines.len().saturating_sub(1);
-        }
+    if *scroll >= lines.len() {
+        *scroll = lines.len().saturating_sub(1);
+    }
 
-        print!(
-            "{}\r\n",
-            draw_tree(
-                &lines,
-                screen_size.0 as usize,
-                screen_size.1 as usize - 3,
-                *scroll
-            )
-        );
-        set_cursor_position!(1, screen_size.1.saturating_sub(2));
-        print!("{}", render_input(pattern, screen_size));
+    print!(
+        "{}\r\n",
+        draw_tree(
+            &lines,
+            screen_size.0 as usize,
+            screen_size.1 as usize - 3,
+            *scroll
+        )
+    );
+    set_cursor_position!(1, screen_size.1.saturating_sub(2));
+    print!("{}", render_input(pattern, screen_size));
 
-        set_cursor_position!(cursor_pos as u16 + 10, screen_size.1.saturating_sub(1));
+    set_cursor_position!(cursor_pos as u16 + 10, screen_size.1.saturating_sub(1));
 
-        std::io::stdout().flush().expect("Failed to flush stdout");
+    std::io::stdout().flush().expect("Failed to flush stdout");
 }
