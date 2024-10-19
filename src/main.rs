@@ -10,7 +10,7 @@ use termion::raw::IntoRawMode;
 mod input;
 mod render;
 
-use input::get_input;
+use input::handle_input;
 use render::draw;
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -20,8 +20,6 @@ enum Style {
 }
 
 pub enum Direction {
-    Up,
-    Down,
     Left,
     Right,
 }
@@ -211,73 +209,6 @@ fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
             .fold(false, |acc, child| acc | mark_matched_nodes(child, re));
 
     node.matched
-}
-
-fn handle_input(
-    pattern: &mut String,
-    cursor_pos: &mut usize,
-    scroll: &mut usize,
-) -> Option<String> {
-    match get_input() {
-        Event::Key(c) => {
-            if *cursor_pos < pattern.len() {
-                pattern.insert(*cursor_pos, c);
-            } else {
-                pattern.push(c);
-            }
-            *cursor_pos += 1;
-        }
-        Event::Direction(d) => {
-            match d {
-                Direction::Up => {}
-                Direction::Down => {}
-                Direction::Left => {
-                    *cursor_pos = cursor_pos.saturating_sub(1);
-                }
-                Direction::Right => {
-                    *cursor_pos += 1;
-                    if *cursor_pos > pattern.len() {
-                        *cursor_pos = pattern.len();
-                    }
-                }
-            };
-        }
-        Event::Navigation(n) => {
-            match n {
-                Navigation::PageUp => {
-                    *scroll += 1;
-                }
-                Navigation::PageDown => {
-                    *scroll = scroll.saturating_sub(1);
-                }
-                Navigation::Home => {
-                    *cursor_pos = 0;
-                }
-                Navigation::End => {
-                    *cursor_pos = pattern.len();
-                }
-            };
-        }
-        Event::Backspace => {
-            let one_before = cursor_pos.saturating_sub(1);
-            if one_before < pattern.len() {
-                pattern.remove(one_before);
-            }
-            *cursor_pos = cursor_pos.saturating_sub(1);
-        }
-        Event::Clear => {
-            pattern.clear();
-            *cursor_pos = 0;
-        }
-        Event::Enter => {
-            return Some(format!("{}", pattern));
-        }
-        Event::Exit => {
-            return Some(String::new());
-        }
-    }
-
-    None
 }
 
 fn main_loop(

@@ -139,7 +139,10 @@ pub fn draw(
     set_cursor_position!(1, screen_size.1.saturating_sub(2));
     print!("{}", render_input(pattern, screen_size));
 
-    set_cursor_position!(cursor_pos as u16 + 10, screen_size.1.saturating_sub(1));
+    set_cursor_position!(
+        u16::try_from(cursor_pos).expect("Cursor position is too large") + 10,
+        screen_size.1.saturating_sub(1)
+    );
 
     std::io::stdout().flush().expect("Failed to flush stdout");
 }

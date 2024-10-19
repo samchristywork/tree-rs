@@ -44,8 +44,6 @@ fn handle_control_keys(char_value: char) -> Event {
         Ok(()) => {
             let char_value = buffer[0] as char;
             match char_value as u8 {
-                0x41 => Event::Direction(Direction::Up),
-                0x42 => Event::Direction(Direction::Down),
                 0x43 => Event::Direction(Direction::Right),
                 0x44 => Event::Direction(Direction::Left),
                 0x35 => consume_7e(char_value, Navigation::PageUp),
@@ -59,7 +57,7 @@ fn handle_control_keys(char_value: char) -> Event {
     }
 }
 
-pub fn get_input() -> Event {
+fn get_input_chars() -> Event {
     let mut buffer = [0; 1];
     match io::stdin().read_exact(&mut buffer) {
         Ok(()) => {
@@ -75,4 +73,69 @@ pub fn get_input() -> Event {
         }
         Err(_) => Event::Exit,
     }
+}
+
+pub fn handle_input(
+    pattern: &mut String,
+    cursor_pos: &mut usize,
+    scroll: &mut usize,
+) -> Option<String> {
+    match get_input_chars() {
+        Event::Key(c) => {
+            if *cursor_pos < pattern.len() {
+                pattern.insert(*cursor_pos, c);
+            } else {
+                pattern.push(c);
+            }
+            *cursor_pos += 1;
+        }
+        Event::Direction(d) => {
+            match d {
+                Direction::Left => {
+                    *cursor_pos = cursor_pos.saturating_sub(1);
+                }
+                Direction::Right => {
+                    *cursor_pos += 1;
+                    if *cursor_pos > pattern.len() {
+                        *cursor_pos = pattern.len();
+                    }
+                }
+            };
+        }
+        Event::Navigation(n) => {
+            match n {
+                Navigation::PageUp => {
+                    *scroll += 1;
+                }
+                Navigation::PageDown => {
+                    *scroll = scroll.saturating_sub(1);
+                }
+                Navigation::Home => {
+                    *cursor_pos = 0;
+                }
+                Navigation::End => {
+                    *cursor_pos = pattern.len();
+                }
+            };
+        }
+        Event::Backspace => {
+            let one_before = cursor_pos.saturating_sub(1);
+            if one_before < pattern.len() {
+                pattern.remove(one_before);
+            }
+            *cursor_pos = cursor_pos.saturating_sub(1);
+        }
+        Event::Clear => {
+            pattern.clear();
+            *cursor_pos = 0;
+        }
+        Event::Enter => {
+            return Some(pattern.clone());
+        }
+        Event::Exit => {
+            return Some(String::new());
+        }
+    }
+
+    None
 }
