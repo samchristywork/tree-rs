@@ -105,16 +105,16 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
         "{}\r\n{}\r\n{}",
         fixed_length_string(hex.as_str(), screen_size.0 as usize),
         fixed_length_string(
-            format!("Pattern: '{pattern}'").as_str(),
+            format!("Pattern: {pattern}").as_str(),
             screen_size.0 as usize
         ),
         fixed_length_string("Ctrl+D to exit", screen_size.0 as usize)
     )
 }
 
-pub fn draw(directory_tree: &DirectoryNode, pattern: &str, style: &Style, scroll: &mut usize, screen_size: (u16, u16)) {
+pub fn draw(directory_tree: &DirectoryNode, pattern: &str, style: &Style, scroll: &mut usize, screen_size: (u16, u16), cursor_pos: usize) {
         set_cursor_position!(1, 1);
-        let lines = render_directory_tree(&directory_tree, "", true, style);
+        let lines = render_directory_tree(directory_tree, "", true, style);
 
         if *scroll >= lines.len() {
             *scroll = lines.len().saturating_sub(1);
@@ -131,5 +131,8 @@ pub fn draw(directory_tree: &DirectoryNode, pattern: &str, style: &Style, scroll
         );
         set_cursor_position!(1, screen_size.1.saturating_sub(2));
         print!("{}", render_input(pattern, screen_size));
+
+        set_cursor_position!(cursor_pos as u16 + 10, screen_size.1.saturating_sub(1));
+
         std::io::stdout().flush().expect("Failed to flush stdout");
 }

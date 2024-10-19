@@ -203,13 +203,14 @@ fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
     node.matched
 }
 
-fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<String> {
+fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Result<Option<String>, String> {
     let term = termion::get_tty().expect("Failed to get terminal");
     let _raw_term = term.into_raw_mode().expect("Failed to enter raw mode");
     let mut directory_tree = build_directory_tree(directory);
 
     let mut pattern = String::new();
     let mut scroll = 0;
+    let mut cursor_pos = 0;
     loop {
         let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
@@ -222,8 +223,9 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
         let re = match Regex::new(&p) {
             Ok(re) => re,
             Err(e) => {
-                eprintln!("{RED}Error: Failed to compile regex: {e}\r\n{NORMAL}");
-                return None;
+                return Err(format!(
+                    "Error: Invalid regex pattern '{pattern}': {e}"
+                ))
             }
         };
 
@@ -235,18 +237,31 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
             style,
             &mut scroll,
             screen_size,
+            cursor_pos,
         );
 
         match get_input() {
             Event::Key(c) => {
-                pattern.push(c);
+                if cursor_pos < pattern.len() {
+                    pattern.insert(cursor_pos, c);
+                } else {
+                    pattern.push(c);
+                }
+                cursor_pos += 1;
             }
             Event::Direction(d) => {
                 match d {
                     Direction::Up => {}
                     Direction::Down => {}
-                    Direction::Left => {}
-                    Direction::Right => {}
+                    Direction::Left => {
+                        cursor_pos = cursor_pos.saturating_sub(1);
+                    }
+                    Direction::Right => {
+                        cursor_pos += 1;
+                        if cursor_pos > pattern.len() {
+                            cursor_pos = pattern.len();
+                        }
+                    }
                 };
             }
             Event::Navigation(n) => {
@@ -257,18 +272,27 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
                     Navigation::PageDown => {
                         scroll = scroll.saturating_sub(1);
                     }
-                    Navigation::Home => {}
-                    Navigation::End => {}
+                    Navigation::Home => {
+                        cursor_pos = 0;
+                    }
+                    Navigation::End => {
+                        cursor_pos = pattern.len();
+                    }
                 };
             }
             Event::Backspace => {
-                pattern.pop();
+                let one_before = cursor_pos.saturating_sub(1);
+                if one_before < pattern.len() {
+                    pattern.remove(one_before);
+                }
+                cursor_pos = cursor_pos.saturating_sub(1);
             }
             Event::Clear => {
                 pattern.clear();
+                cursor_pos = 0;
             }
             Event::Enter => {
-                return Some(pattern);
+                return Ok(Some(pattern));
             }
             Event::Exit => {
                 break;
@@ -276,7 +300,7 @@ fn main_loop(directory: &str, style: &Style, case_sensitive: bool) -> Option<Str
         }
     }
 
-    None
+    Ok(None)
 }
 
 fn main() {
@@ -287,8 +311,17 @@ fn main() {
     };
 
     print!("{ALTERNATE_SCREEN}");
-    let result = main_loop(&args.directory, &style, args.case_sensitive);
-    print!("{NORMAL_SCREEN}");
+    let result = match main_loop(&args.directory, &style, args.case_sensitive) {
+        Ok(result) => {
+            print!("{NORMAL_SCREEN}");
+            result
+        }
+        Err(e) => {
+            print!("{NORMAL_SCREEN}");
+            print!("{RED}{e}{NORMAL}");
+            None
+        }
+    };
 
     if let Some(pattern) = result {
         print!("{pattern}");
