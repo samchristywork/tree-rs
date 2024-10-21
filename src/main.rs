@@ -1,15 +1,15 @@
 use clap::Parser;
 use clap::ValueEnum;
 use regex::Regex;
-use std::fs;
 use std::io;
-use std::path::Path;
 use std::path::PathBuf;
 use termion::raw::IntoRawMode;
 
+mod generate;
 mod input;
 mod render;
 
+use generate::build_directory_tree;
 use input::handle_input;
 use render::draw;
 
@@ -41,9 +41,6 @@ pub enum Event {
     Exit,
 }
 
-const CYAN: &str = "\x1B[36m";
-const MAGENTA: &str = "\x1B[35m";
-const YELLOW: &str = "\x1B[33m";
 const RED: &str = "\x1B[31m";
 const NORMAL: &str = "\x1B[0m";
 const INVERT: &str = "\x1B[7m";
@@ -124,78 +121,6 @@ struct DirectoryNode {
     matched: bool,
     color: String,
     error: Option<io::Error>,
-}
-
-fn determine_color(path: &Path) -> String {
-    if path.is_symlink() {
-        YELLOW // Symlinks
-    } else if path.is_dir() {
-        CYAN // Directories
-    } else {
-        MAGENTA // Regular files
-    }
-    .to_string()
-}
-
-fn build_directory_tree(dir: &str) -> DirectoryNode {
-    let path = PathBuf::from(dir);
-
-    if !path.is_dir() {
-        return DirectoryNode {
-            path: path.clone(),
-            children: Vec::new(),
-            matched: false,
-            color: determine_color(&path),
-            error: Some(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Error: '{dir}' is not a directory."),
-            )),
-        };
-    }
-
-    let children = match fs::read_dir(&path) {
-        Ok(entries) => entries.filter_map(Result::ok),
-        Err(e) => {
-            return DirectoryNode {
-                path,
-                children: Vec::new(),
-                matched: false,
-                color: RED.to_string(),
-                error: Some(e),
-            };
-        }
-    }
-    .map(|entry| {
-        if entry
-            .file_type()
-            .expect("Failed to get file type for entry")
-            .is_dir()
-        {
-            build_directory_tree(
-                entry
-                    .path()
-                    .to_str()
-                    .expect("Failed to convert path to string"),
-            )
-        } else {
-            DirectoryNode {
-                color: determine_color(&entry.path()),
-                path: entry.path(),
-                children: Vec::new(),
-                matched: false,
-                error: None,
-            }
-        }
-    })
-    .collect();
-
-    DirectoryNode {
-        path: path.clone(),
-        children,
-        matched: false,
-        color: determine_color(&path),
-        error: None,
-    }
 }
 
 fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
