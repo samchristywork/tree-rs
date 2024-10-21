@@ -74,46 +74,38 @@ struct Line {
 }
 
 impl Line {
-    fn highlight(&self, s: &str) -> String {
+    fn highlight(&self, s: &str, re: &Regex) -> String {
         let mut highlighted = String::new();
-        for c in s.chars() {
-            if c == 'a' {
-                highlighted.push_str(&format!("{INVERT}{c}{UNINVERT}"));
-            } else {
-                highlighted.push(c);
-            }
+        let mut last_end = 0;
+
+        for mat in re.find_iter(s) {
+            highlighted.push_str(&s[last_end..mat.start()]);
+            highlighted.push_str(&format!("{INVERT}{}{}", &s[mat.start()..mat.end()], UNINVERT));
+            last_end = mat.end();
         }
 
+        highlighted.push_str(&s[last_end..]);
         highlighted
     }
 
-    fn length(&self) -> usize {
-        self.first_part.len() + self.last_part.len()
-    }
-
-    fn to_string(&self, n: usize) -> String {
-        if self.length() <= n {
-            format!(
-                "{}{}{}{NORMAL}",
-                self.first_part,
-                self.color,
-                self.highlight(&self.last_part)
-            )
-        } else if self.first_part.len() < n {
-            format!(
-                "{}{}{}{NORMAL}",
-                self.first_part,
-                self.color,
-                self.highlight(&self.last_part[..n - self.first_part.len()])
-            )
-        } else {
-            format!(
-                "{}{}{}{NORMAL}",
-                &self.first_part[..n],
-                self.color,
-                self.highlight(&self.last_part)
-            )
+    fn to_string(&self, re: &Regex, n: usize) -> String {
+        if n < self.first_part.len() {
+            return self.first_part[..n].to_string();
         }
+
+        let remaining = n - self.first_part.len();
+        let s = if remaining > self.last_part.len() {
+            &self.last_part.clone()
+        } else {
+            &self.last_part[..remaining].to_string()
+        };
+        let last_part = self.highlight(s, re);
+
+        format!(
+            "{}{}{last_part}{NORMAL}{UNINVERT}",
+            self.first_part,
+            self.color
+        )
     }
 }
 
