@@ -1,5 +1,5 @@
-use std::io::Write;
 use regex::Regex;
+use std::io::Write;
 
 use crate::DirectoryNode;
 use crate::Line;
@@ -77,7 +77,13 @@ fn flatten_tree(node: &DirectoryNode, prefix: &str, is_last: bool, style: &Style
     lines
 }
 
-fn render_tree(tree: &[Line], max_width: usize, max_height: usize, scroll: usize, re: &Regex) -> String {
+fn render_tree(
+    tree: &[Line],
+    max_width: usize,
+    max_height: usize,
+    scroll: usize,
+    re: &Regex,
+) -> String {
     let blank_line = &(" ".repeat(max_width) + "\r");
 
     tree.iter()

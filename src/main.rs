@@ -74,13 +74,17 @@ struct Line {
 }
 
 impl Line {
-    fn highlight(&self, s: &str, re: &Regex) -> String {
+    fn highlight(s: &str, re: &Regex) -> String {
         let mut highlighted = String::new();
         let mut last_end = 0;
 
         for mat in re.find_iter(s) {
             highlighted.push_str(&s[last_end..mat.start()]);
-            highlighted.push_str(&format!("{INVERT}{}{}", &s[mat.start()..mat.end()], UNINVERT));
+            highlighted.push_str(&format!(
+                "{INVERT}{}{}",
+                &s[mat.start()..mat.end()],
+                UNINVERT
+            ));
             last_end = mat.end();
         }
 
@@ -99,12 +103,11 @@ impl Line {
         } else {
             &self.last_part[..remaining].to_string()
         };
-        let last_part = self.highlight(s, re);
+        let last_part = Self::highlight(s, re);
 
         format!(
             "{}{}{last_part}{NORMAL}{UNINVERT}",
-            self.first_part,
-            self.color
+            self.first_part, self.color
         )
     }
 }
@@ -127,6 +130,7 @@ fn main_loop(
     let mut directory_tree = build_directory_tree(directory);
 
     let mut pattern = String::new();
+    let mut last_working_pattern = String::new();
     let mut scroll = 0;
     let mut cursor_pos = 0;
     loop {
@@ -139,8 +143,11 @@ fn main_loop(
         };
 
         let re = match Regex::new(&p) {
-            Ok(re) => re,
-            Err(e) => return Err(format!("Error: Invalid regex pattern '{pattern}': {e}")),
+            Ok(re) => {
+                last_working_pattern.clone_from(&p);
+                re
+            }
+            Err(_) => Regex::new(&last_working_pattern).expect("Failed to create regex"),
         };
 
         mark_matched_nodes(&mut directory_tree, &re);
