@@ -7,10 +7,12 @@ use termion::raw::IntoRawMode;
 
 mod generate;
 mod input;
+mod mark;
 mod render;
 
 use generate::build_directory_tree;
 use input::handle_input;
+use mark::mark_matched_nodes;
 use render::draw;
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -121,19 +123,6 @@ struct DirectoryNode {
     matched: bool,
     color: String,
     error: Option<io::Error>,
-}
-
-fn mark_matched_nodes(node: &mut DirectoryNode, re: &Regex) -> bool {
-    node.matched = node
-        .path
-        .file_name()
-        .is_some_and(|f| re.is_match(f.to_string_lossy().as_ref()))
-        | node
-            .children
-            .iter_mut()
-            .fold(false, |acc, child| acc | mark_matched_nodes(child, re));
-
-    node.matched
 }
 
 fn main_loop(
