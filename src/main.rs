@@ -13,7 +13,7 @@ mod render;
 use generate::build_directory_tree;
 use input::handle_input;
 use mark::mark_matched_nodes;
-use render::draw;
+use render::render;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Style {
@@ -153,13 +153,14 @@ fn main_loop(
 
         mark_matched_nodes(&mut directory_tree, &re);
 
-        draw(
+        render(
             &directory_tree,
             &pattern,
             style,
             &mut scroll,
             screen_size,
             cursor_pos,
+            &re,
         );
 
         match handle_input(&mut pattern, &mut cursor_pos, &mut scroll) {

@@ -12,7 +12,7 @@ const CTRL_D: u8 = 0x04;
 const ENTER: u8 = b'\r';
 const ESCAPE: u8 = 0x1b;
 
-fn consume_7e(char_value: char, event: Navigation) -> Event {
+fn handle_nav_key(char_value: char, event: Navigation) -> Event {
     let mut buffer = [0; 1];
     match io::stdin().read_exact(&mut buffer) {
         Ok(()) => {
@@ -46,10 +46,10 @@ fn handle_control_keys(char_value: char) -> Event {
             match char_value as u8 {
                 0x43 => Event::Direction(Direction::Right),
                 0x44 => Event::Direction(Direction::Left),
-                0x35 => consume_7e(char_value, Navigation::PageUp),
-                0x36 => consume_7e(char_value, Navigation::PageDown),
-                0x31 => consume_7e(char_value, Navigation::Home),
-                0x34 => consume_7e(char_value, Navigation::End),
+                0x35 => handle_nav_key(char_value, Navigation::PageUp),
+                0x36 => handle_nav_key(char_value, Navigation::PageDown),
+                0x31 => handle_nav_key(char_value, Navigation::Home),
+                0x34 => handle_nav_key(char_value, Navigation::End),
                 _ => Event::Key(char_value),
             }
         }
@@ -105,10 +105,10 @@ pub fn handle_input(
         Event::Navigation(n) => {
             match n {
                 Navigation::PageUp => {
-                    *scroll += 1;
+                    *scroll = scroll.saturating_sub(5);
                 }
                 Navigation::PageDown => {
-                    *scroll = scroll.saturating_sub(1);
+                    *scroll += 5;
                 }
                 Navigation::Home => {
                     *cursor_pos = 0;

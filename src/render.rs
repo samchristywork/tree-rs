@@ -1,4 +1,5 @@
 use std::io::Write;
+use regex::Regex;
 
 use crate::DirectoryNode;
 use crate::Line;
@@ -18,12 +19,7 @@ fn fixed_length_string(s: &str, n: usize) -> String {
     }
 }
 
-fn render_directory_tree(
-    node: &DirectoryNode,
-    prefix: &str,
-    is_last: bool,
-    style: &Style,
-) -> Vec<Line> {
+fn flatten_tree(node: &DirectoryNode, prefix: &str, is_last: bool, style: &Style) -> Vec<Line> {
     if !node.matched {
         return vec![];
     }
@@ -60,7 +56,7 @@ fn render_directory_tree(
         .unwrap_or(0);
 
     for (i, child) in node.children.iter().enumerate() {
-        lines.extend(render_directory_tree(
+        lines.extend(flatten_tree(
             child,
             &if is_last {
                 match style {
@@ -81,14 +77,14 @@ fn render_directory_tree(
     lines
 }
 
-fn draw_tree(tree: &[Line], max_width: usize, max_height: usize, scroll: usize) -> String {
+fn render_tree(tree: &[Line], max_width: usize, max_height: usize, scroll: usize, re: &Regex) -> String {
     let blank_line = &(" ".repeat(max_width) + "\r");
 
     tree.iter()
         .skip(scroll)
         .take(max_height)
         .fold(String::new(), |acc, line| {
-            acc + blank_line + line.to_string(max_width).as_str() + "\r\n"
+            acc + blank_line + line.to_string(re, max_width).as_str() + "\r\n"
         })
         + ((tree.len() - scroll)..max_height)
             .fold(String::new(), |acc, _| acc + blank_line + "\r\n")
@@ -112,16 +108,17 @@ fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
     )
 }
 
-pub fn draw(
+pub fn render(
     directory_tree: &DirectoryNode,
     pattern: &str,
     style: &Style,
     scroll: &mut usize,
     screen_size: (u16, u16),
     cursor_pos: usize,
+    re: &Regex,
 ) {
     set_cursor_position!(1, 1);
-    let lines = render_directory_tree(directory_tree, "", true, style);
+    let lines = flatten_tree(directory_tree, "", true, style);
 
     if *scroll >= lines.len() {
         *scroll = lines.len().saturating_sub(1);
@@ -129,11 +126,12 @@ pub fn draw(
 
     print!(
         "{}\r\n",
-        draw_tree(
+        render_tree(
             &lines,
             screen_size.0 as usize,
             screen_size.1 as usize - 3,
-            *scroll
+            *scroll,
+            re,
         )
     );
     set_cursor_position!(1, screen_size.1.saturating_sub(2));
