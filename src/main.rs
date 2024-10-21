@@ -134,16 +134,16 @@ fn main_loop(
     let mut scroll = 0;
     let mut cursor_pos = 0;
     loop {
-        let screen_size = termion::terminal_size().unwrap_or((80, 24));
-
         let p = if case_sensitive {
             format!("(?-s:{pattern})")
         } else {
             format!("(?i:{pattern})")
         };
 
+        let mut pattern_is_valid = false;
         let re = match Regex::new(&p) {
             Ok(re) => {
+                pattern_is_valid = true;
                 last_working_pattern.clone_from(&p);
                 re
             }
@@ -157,9 +157,9 @@ fn main_loop(
             &pattern,
             style,
             &mut scroll,
-            screen_size,
             cursor_pos,
             &re,
+            pattern_is_valid,
         );
 
         match handle_input(&mut pattern, &mut cursor_pos, &mut scroll) {

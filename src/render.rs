@@ -97,8 +97,13 @@ fn render_tree(
             .as_str()
 }
 
-fn render_input(pattern: &str, screen_size: (u16, u16)) -> String {
+fn render_input(pattern: &str, pattern_is_valid: bool, screen_size: (u16, u16)) -> String {
     let mut hex = String::new();
+
+    if !pattern_is_valid {
+        hex.push_str("Invalid Pattern ");
+    }
+
     for byte in pattern.as_bytes() {
         hex.push_str(&format!("0x{byte:02x} "));
     }
@@ -119,10 +124,12 @@ pub fn render(
     pattern: &str,
     style: &Style,
     scroll: &mut usize,
-    screen_size: (u16, u16),
     cursor_pos: usize,
     re: &Regex,
+    pattern_is_valid: bool,
 ) {
+    let screen_size = termion::terminal_size().unwrap_or((80, 24));
+
     set_cursor_position!(1, 1);
     let lines = flatten_tree(directory_tree, "", true, style);
 
@@ -141,7 +148,7 @@ pub fn render(
         )
     );
     set_cursor_position!(1, screen_size.1.saturating_sub(2));
-    print!("{}", render_input(pattern, screen_size));
+    print!("{}", render_input(pattern, pattern_is_valid, screen_size));
 
     set_cursor_position!(
         u16::try_from(cursor_pos).expect("Cursor position is too large") + 10,
