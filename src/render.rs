@@ -83,18 +83,32 @@ fn render_tree(
     max_height: usize,
     scroll: usize,
     re: &Regex,
+    selected: &mut usize,
 ) -> String {
     let blank_line = &(" ".repeat(max_width) + "\r");
 
-    tree.iter()
+    let mut foo = 0;
+    let bar = tree.iter()
         .skip(scroll)
         .take(max_height)
         .fold(String::new(), |acc, line| {
-            acc + blank_line + line.to_string(re, max_width).as_str() + "\r\n"
+            let is_match = if re.is_match(&line.last_part) {
+                foo += 1;
+                true
+            } else {
+                false
+            };
+
+            acc + blank_line + line.to_string(re, max_width, *selected == foo && is_match).as_str() + "\r\n"
         })
         + ((tree.len() - scroll)..max_height)
             .fold(String::new(), |acc, _| acc + blank_line + "\r\n")
-            .as_str()
+            .as_str();
+    if foo < *selected {
+        *selected = foo;
+    }
+
+    bar
 }
 
 fn render_input(pattern: &str, pattern_is_valid: bool, screen_size: (u16, u16)) -> String {
@@ -127,6 +141,7 @@ pub fn render(
     cursor_pos: usize,
     re: &Regex,
     pattern_is_valid: bool,
+    selected: &mut usize,
 ) {
     let screen_size = termion::terminal_size().unwrap_or((80, 24));
 
@@ -145,6 +160,7 @@ pub fn render(
             screen_size.1 as usize - 3,
             *scroll,
             re,
+            selected,
         )
     );
     set_cursor_position!(1, screen_size.1.saturating_sub(2));

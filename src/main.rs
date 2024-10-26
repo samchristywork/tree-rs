@@ -92,7 +92,7 @@ impl Line {
         highlighted
     }
 
-    fn to_string(&self, re: &Regex, n: usize) -> String {
+    fn to_string(&self, re: &Regex, n: usize, selected: bool) -> String {
         if n < self.first_part.len() {
             return self.first_part[..n].to_string();
         }
@@ -103,12 +103,19 @@ impl Line {
         } else {
             &self.last_part[..remaining].to_string()
         };
-        let last_part = Self::highlight(s, re);
 
-        format!(
-            "{}{}{last_part}{NORMAL}{UNINVERT}",
-            self.first_part, self.color
-        )
+        if selected {
+            format!(
+                ">{}{INVERT}{}{}{NORMAL}{UNINVERT}",
+                self.first_part, self.color, s
+            )
+        } else {
+            let last_part = Self::highlight(s, re);
+            format!(
+                " {}{}{last_part}{NORMAL}{UNINVERT}",
+                self.first_part, self.color
+            )
+        }
     }
 }
 
@@ -133,6 +140,7 @@ fn main_loop(
     let mut last_working_pattern = String::new();
     let mut scroll = 0;
     let mut cursor_pos = 0;
+    let mut selected = 0;
     loop {
         let p = if case_sensitive {
             format!("(?-s:{pattern})")
@@ -160,6 +168,7 @@ fn main_loop(
             cursor_pos,
             &re,
             pattern_is_valid,
+            &mut selected,
         );
 
         match handle_input(&mut pattern, &mut cursor_pos, &mut scroll) {

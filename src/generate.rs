@@ -1,6 +1,5 @@
 use std::fs;
 use std::io;
-use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -55,7 +54,7 @@ pub fn build_directory_tree(dir: &str) -> DirectoryNode {
     }
     .map(|entry| {
         let count = COUNT.fetch_add(1, Ordering::SeqCst) + 1;
-        if count % 100000 == 0 {
+        if count % 100_000 == 0 {
             println!("Count: {count} {}\r", entry.path().display());
         }
 
