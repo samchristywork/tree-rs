@@ -1,7 +1,9 @@
 use std::fs;
 use std::io;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::DirectoryNode;
 
@@ -20,6 +22,8 @@ fn determine_color(path: &Path) -> String {
     }
     .to_string()
 }
+
+static COUNT: AtomicUsize = AtomicUsize::new(0);
 
 pub fn build_directory_tree(dir: &str) -> DirectoryNode {
     let path = PathBuf::from(dir);
@@ -50,6 +54,11 @@ pub fn build_directory_tree(dir: &str) -> DirectoryNode {
         }
     }
     .map(|entry| {
+        let count = COUNT.fetch_add(1, Ordering::SeqCst) + 1;
+        if count % 100000 == 0 {
+            println!("Count: {count} {}\r", entry.path().display());
+        }
+
         if entry
             .file_type()
             .expect("Failed to get file type for entry")

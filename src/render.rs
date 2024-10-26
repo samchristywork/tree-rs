@@ -25,7 +25,7 @@ fn flatten_tree(node: &DirectoryNode, prefix: &str, is_last: bool, style: &Style
     }
 
     let file_name = node.path.file_name().map_or_else(
-        || "<unknown>".to_string(),
+        || ".".to_string(),
         |name| name.to_string_lossy().into_owned(),
     );
 
